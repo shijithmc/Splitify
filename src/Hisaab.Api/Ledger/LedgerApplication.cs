@@ -1,11 +1,12 @@
 using Hisaab.Api.Contracts;
 using Hisaab.Api.Identity;
+using Hisaab.Api.Receipts;
 using Hisaab.Api.Shared;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
 namespace Hisaab.Api.Ledger;
 
-public sealed class LedgerApplication(IAtomicStore store, CommandExecutor commands, IConfiguration config, IdentityService identity, TokenProtector protector)
+public sealed class LedgerApplication(IAtomicStore store, CommandExecutor commands, IConfiguration config, IdentityService identity, TokenProtector protector, ReceiptAttachmentService receipts)
 {
     public async Task<GroupDetail> GetGroupAsync(string id, string userId, CancellationToken ct = default)
     {
@@ -169,30 +170,46 @@ public sealed class LedgerApplication(IAtomicStore store, CommandExecutor comman
         foreach (var pointer in page.Items) { var row = await store.GetAsync(pointer.Pk, $"EXPENSE#{pointer.Data.GetProperty("id").GetString()}", ct); if (row is not null) items.Add(row.Deserialize<Expense>()); }
         return new { items, nextCursor = page.NextCursor };
     }
-    public Task<System.Text.Json.JsonElement> SaveExpenseAsync(Actor actor, string key, string id, ExpenseRequest input, bool edit, CancellationToken ct = default) => commands.ExecuteAsync(actor, key, $"group:{id}:expense:{input.Id}:{edit}", input, async () =>
+    public async Task<Expense> ExpenseAsync(string id, string expenseId, string userId, CancellationToken ct = default)
+    {
+        await RequireGroupAsync(id, userId, ct);
+        var expense = (await store.GetAsync($"GROUP#{id}", $"EXPENSE#{expenseId}", ct))?.Deserialize<Expense>() ?? throw NotFound();
+        await RequireGroupAsync(id, userId, ct);
+        return expense;
+    }
+    public async Task<System.Text.Json.JsonElement> SaveExpenseAsync(Actor actor, string key, string id, ExpenseRequest input, bool edit, CancellationToken ct = default)
+    {
+        // Replays must still check current receipt membership before returning a cached result.
+        if (input.Receipt is not null) await receipts.AuthorizeAsync(input.Receipt.ReceiptId, id, actor.User.Id, ct);
+        return await commands.ExecuteAsync(actor, key, $"group:{id}:expense:{input.Id}:{edit}", input, async () =>
     {
         if (!Guid.TryParse(input.Id, out _)) throw new DomainException(422, "id_invalid", "Expense ID must be a UUID.");
         var (row, group, balances, balanceRows) = await SnapshotAsync(id, actor.User.Id, ct);
         var currentRow = await store.GetAsync(row.Pk, $"EXPENSE#{input.Id}", ct); var current = currentRow?.Deserialize<Expense>();
         var now = DateTimeOffset.UtcNow;
         var draft = new Expense(input.Id, id, input.Description, input.AmountPaise, input.Date, input.PayerId, input.Mode, input.Participants, new Dictionary<string, long>(), 0, null, actor.User.Id, now);
+        var attachment = await receipts.BuildAsync(group, draft, current, input.Receipt, actor.User.Id, now, ct);
+        draft = attachment.Draft;
         Expense saved;
         if (edit) { if (current is null) throw NotFound(); saved = ExpenseService.Update(group, current, draft, actor.User.Id, input.Version, now); balances = LedgerEngine.ApplyExpense(balances, current, -1); }
         else { if (current is not null) throw new DomainException(409, "expense_exists", "This expense has already been saved."); saved = ExpenseService.Create(group, draft, actor.User.Id, now); }
         balances = LedgerEngine.ApplyExpense(balances, saved);
         var updated = group with { Version = group.Version + 1, ExpenseCount = group.ExpenseCount + (edit ? 0 : 1) };
         var writes = new List<StoreMutation> { PutGroup(row, updated), StoreMutation.Put(StoreRow.Create(row.Pk, $"EXPENSE#{saved.Id}", saved.Version, saved), currentRow?.Version) };
+        writes.AddRange(attachment.Writes);
         if (current is not null && current.Date != saved.Date) { var old = await store.GetAsync(row.Pk, DateKey(current), ct); if (old is not null) writes.Add(StoreMutation.Delete(old.Pk, old.Sk, old.Version)); }
         var pointer = await store.GetAsync(row.Pk, DateKey(saved), ct); writes.Add(StoreMutation.Put(StoreRow.Create(row.Pk, DateKey(saved), (pointer?.Version ?? 0) + 1, new { id = saved.Id }), pointer?.Version));
         AddBalances(writes, row.Pk, balances, balanceRows); AddEvent(writes, updated, actor.User.Id, edit ? "expense_updated" : "expense_added", saved.Id, saved.Participants.Select(p => p.ParticipantId).Append(saved.PayerId).Concat(current?.Participants.Select(p => p.ParticipantId) ?? []).Concat(current is null ? [] : [current.PayerId]), new { before = Audit(current), after = Audit(saved), descriptionChanged = current?.Description != saved.Description });
         return new(saved, writes);
     }, ct);
+    }
     public Task<System.Text.Json.JsonElement> TransitionExpenseAsync(Actor actor, string key, string id, string expenseId, long version, bool restore, CancellationToken ct = default) => commands.ExecuteAsync(actor, key, $"group:{id}:expense:{expenseId}:{restore}", new { version }, async () =>
     {
         var (row, group, balances, balanceRows) = await SnapshotAsync(id, actor.User.Id, ct); var expenseRow = await store.GetAsync(row.Pk, $"EXPENSE#{expenseId}", ct) ?? throw NotFound(); var current = expenseRow.Deserialize<Expense>();
         var saved = restore ? ExpenseService.Restore(group, current, actor.User.Id, version, DateTimeOffset.UtcNow) : ExpenseService.Delete(group, current, actor.User.Id, version, DateTimeOffset.UtcNow);
         var next = LedgerEngine.ApplyExpense(balances, restore ? saved : current, restore ? 1 : -1); var updated = group with { Version = group.Version + 1 };
         var writes = new List<StoreMutation> { PutGroup(row, updated), StoreMutation.Put(StoreRow.Create(row.Pk, expenseRow.Sk, saved.Version, saved), expenseRow.Version) };
+        writes.AddRange(await receipts.ExpenseTransitionAsync(saved, restore, DateTimeOffset.UtcNow, ct));
         AddBalances(writes, row.Pk, next, balanceRows); AddEvent(writes, updated, actor.User.Id, restore ? "expense_restored" : "expense_deleted", expenseId, current.Participants.Select(p => p.ParticipantId).Append(current.PayerId), new { before = Audit(current), after = Audit(saved) }); return new(saved, writes);
     }, ct);
     public Task<System.Text.Json.JsonElement> SettleAsync(Actor actor, string key, string id, SettlementRequest input, CancellationToken ct = default) => commands.ExecuteAsync(actor, key, $"group:{id}:settlement:{input.Id}", input, async () =>
@@ -222,7 +239,9 @@ public sealed class LedgerApplication(IAtomicStore store, CommandExecutor comman
     public Task<System.Text.Json.JsonElement> DeleteGroupAsync(Actor actor, string key, string id, long version, CancellationToken ct = default) => commands.ExecuteAsync(actor, key, $"group:{id}:delete", new { version }, async () =>
     {
         var (row, group, balances, _) = await SnapshotAsync(id, actor.User.Id, ct); GroupRules.EnsureCanDelete(group, actor.User.Id, version, balances);
-        var updated = group with { Deleted = true, Archived = true, Version = group.Version + 1 }; var writes = new List<StoreMutation> { PutGroup(row, updated) }; AddEvent(writes, updated, actor.User.Id, "group_deleted", id); return new(new { deleted = true }, writes);
+        var updated = group with { Deleted = true, Archived = true, Version = group.Version + 1 }; var writes = new List<StoreMutation> { PutGroup(row, updated) };
+        writes.AddRange(await receipts.GroupDeletedAsync(id, DateTimeOffset.UtcNow, ct));
+        AddEvent(writes, updated, actor.User.Id, "group_deleted", id); return new(new { deleted = true }, writes);
     }, ct);
     public async Task<object> HomeAsync(string userId, CancellationToken ct = default)
     {
@@ -299,7 +318,7 @@ public sealed class LedgerApplication(IAtomicStore store, CommandExecutor comman
     private static string DateKey(Expense expense) => $"EXPENSEDATE#{DateOnly.MaxValue.DayNumber - expense.Date.DayNumber:D7}#{expense.Id}";
     private static void RequireVersion(long current, long expected) { if (current != expected) throw new DomainException(409, "version_conflict", "This group changed — review latest."); }
     private static DomainException NotFound() => new(404, "not_found", "Not found.");
-    private static object? Audit(Expense? expense) => expense is null ? null : new { expense.AmountPaise, expense.Date, expense.PayerId, expense.Mode, expense.Shares, expense.Version, expense.DeletedAt };
+    private static object? Audit(Expense? expense) => expense is null ? null : new { expense.AmountPaise, expense.Date, expense.PayerId, expense.Mode, expense.Shares, expense.Version, expense.DeletedAt, expense.ReceiptId, expense.ReceiptRevision, expense.DisplaySplitKind };
     private static void AddEvent(List<StoreMutation> writes, Group group, string actorId, string kind, string entityId, IEnumerable<string>? recipients = null, object? changes = null)
     {
         var id = Ids.New(); var activity = new Activity(id, group.Id, kind, actorId, kind.Replace('_', ' '), DateTimeOffset.UtcNow, entityId);

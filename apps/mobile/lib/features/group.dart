@@ -9,6 +9,8 @@ import '../core/money.dart';
 import '../main.dart';
 import 'expense.dart';
 import 'shared.dart';
+import 'receipts.dart';
+import 'receipt_viewer.dart';
 
 class GroupPage extends StatefulWidget {
   final AppController controller;
@@ -119,6 +121,22 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
   }
 
   Future<void> editExpense([Expense? expense]) async {
+    if (expense?.receiptId != null) {
+      await openPage(
+        context,
+        c,
+        ReceiptViewerPage(
+          controller: c,
+          group: group!,
+          receiptId: expense!.receiptId!,
+          expense: expense,
+          editOnOpen: true,
+        ),
+      );
+      await load();
+      await c.refresh();
+      return;
+    }
     await openPage(
       context,
       c,
@@ -201,6 +219,23 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      if (!group!.archived)
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            await openPage(
+                              context,
+                              c,
+                              ReceiptCapturePage(controller: c, group: group!),
+                            );
+                            await load();
+                            await c.refresh();
+                          },
+                          icon: const Icon(
+                            Icons.document_scanner_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Scan bill'),
+                        ),
                       OutlinedButton.icon(
                         onPressed: group!.archived || c.offline
                             ? null
@@ -317,15 +352,19 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
             horizontal: 18,
             vertical: 10,
           ),
-          leading: CircleAvatar(
-            backgroundColor: e.deleted
-                ? const Color(0xFFE9E7E3)
-                : const Color(0xFFEDF0E4),
-            child: Icon(
-              e.deleted ? Icons.delete_outline : Icons.receipt_long_outlined,
-              color: green,
-            ),
-          ),
+          leading: e.receiptId != null && !e.deleted
+              ? ReceiptThumbnail(controller: c, receiptId: e.receiptId!)
+              : CircleAvatar(
+                  backgroundColor: e.deleted
+                      ? const Color(0xFFE9E7E3)
+                      : const Color(0xFFEDF0E4),
+                  child: Icon(
+                    e.deleted
+                        ? Icons.delete_outline
+                        : Icons.receipt_long_outlined,
+                    color: green,
+                  ),
+                ),
           title: Text(
             e.description,
             style: TextStyle(
@@ -637,7 +676,13 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text('${money(e.amount)} · ${e.mode} · ${e.date}'),
+                Text('${money(e.amount)} · ${e.displayMode} · ${e.date}'),
+                if (e.receiptId != null)
+                  TextButton.icon(
+                    onPressed: () => Navigator.pop(context, 'receipt'),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('View bill & item breakdown'),
+                  ),
                 const SizedBox(height: 20),
                 ...e.shares.entries.map(
                   (share) => ListTile(
@@ -688,6 +733,20 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       ),
     );
     if (action == null || !mounted) return;
+    if (action == 'receipt') {
+      await openPage(
+        context,
+        c,
+        ReceiptViewerPage(
+          controller: c,
+          group: group!,
+          receiptId: e.receiptId!,
+          expense: e,
+        ),
+      );
+      await load();
+      return;
+    }
     if (action == 'edit') {
       await editExpense(e);
       return;

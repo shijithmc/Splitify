@@ -112,10 +112,12 @@ class SettingsPage extends StatelessWidget {
               'expenses': 'Expense updates',
               'payments': 'Payment updates',
               'invites': 'Invitations',
+              'receiptDetails': 'Item names and amounts on lock screen',
             }.entries)
               SwitchListTile(
                 title: Text(entry.value),
-                value: c.preferences[entry.key] ?? true,
+                value:
+                    c.preferences[entry.key] ?? (entry.key != 'receiptDetails'),
                 onChanged: c.offline
                     ? null
                     : (enabled) => act(context, () async {
@@ -425,7 +427,7 @@ class _PremiumPageState extends State<PremiumPage> {
           ),
           const SizedBox(height: 18),
           const Text(
-            'Keep Hisaab ad-free, wherever you sign in.\nEvery expense-splitting feature stays free.',
+            'Keep Hisaab ad-free, wherever you sign in.\nUp to 100 successful bill scans per month.\nManual expense splitting stays free.',
             textAlign: TextAlign.center,
             style: TextStyle(height: 1.7, fontSize: 15),
           ),
@@ -444,6 +446,17 @@ class _PremiumPageState extends State<PremiumPage> {
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.devices, color: green),
                     title: Text('One Hisaab account, all your devices'),
+                  ),
+                  const ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.document_scanner_outlined,
+                      color: green,
+                    ),
+                    title: Text('Up to 100 bill scans each month'),
+                    subtitle: Text(
+                      'Resets on the first of the month, IST. Free accounts receive 5 scans.',
+                    ),
                   ),
                   const ListTile(
                     contentPadding: EdgeInsets.zero,

@@ -5,6 +5,8 @@ using Hisaab.Api.Billing;
 using Hisaab.Api.Identity;
 using Hisaab.Api.Ledger;
 using Hisaab.Api.Shared;
+using Hisaab.Api.Receipts;
+using Hisaab.Api.Receipts.Infrastructure;
 using Hisaab.Application.Storage;
 using Hisaab.Infrastructure.Storage;
 using Microsoft.Extensions.Configuration;
@@ -32,7 +34,7 @@ public sealed class Function
         await host.Services.GetRequiredService<BackgroundJobs>().RunAsync(job, budget.Token);
     }
 
-    private static async Task<IHost> GetHostAsync()
+    internal static async Task<IHost> GetHostAsync()
     {
         Task<IHost> pending;
         lock (HostGate) pending = _host ??= CreateHostAsync();
@@ -69,6 +71,15 @@ public sealed class Function
         builder.Services.AddSingleton<AccountDeletionService>();
         builder.Services.AddSingleton<PushService>();
         builder.Services.AddSingleton<BackgroundJobs>();
+        builder.Services.AddReceiptInfrastructure(builder.Configuration, builder.Environment);
+        builder.Services.AddSingleton<ReceiptAccess>();
+        builder.Services.AddSingleton<ReceiptDocuments>();
+        builder.Services.AddSingleton<ReceiptQuotaService>();
+        builder.Services.AddSingleton<ReceiptBudgetService>();
+        builder.Services.AddSingleton<ReceiptLifecycle>();
+        builder.Services.AddSingleton<ReceiptAttachmentService>();
+        builder.Services.AddSingleton<ReceiptService>();
+        builder.Services.AddSingleton<ReceiptWorker>();
         return builder.Build();
     }
 }

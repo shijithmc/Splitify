@@ -5,7 +5,7 @@ using Hisaab.Application.Storage;
 using Hisaab.Domain;
 namespace Hisaab.Api.Identity;
 
-public sealed class AccountDeletionService(IAtomicStore store, IdentityService identity, AppleTokens apple, IHttpClientFactory clients, IConfiguration config, IHostEnvironment environment)
+public sealed class AccountDeletionService(IAtomicStore store, IdentityService identity, AppleTokens apple, IHttpClientFactory clients, IConfiguration config, IHostEnvironment environment, Hisaab.Api.Receipts.ReceiptLifecycle? receipts = null)
 {
     public async Task<object> RequestAsync(Actor actor, bool confirm, CancellationToken ct = default)
     {
@@ -56,6 +56,7 @@ public sealed class AccountDeletionService(IAtomicStore store, IdentityService i
             var next = StoreRow.Create(job.Pk, job.Sk, job.Version + 1, state);
             await store.TransactAsync([StoreMutation.Put(next, job.Version)], ct); job = next;
         }
+        if (receipts is not null) await receipts.AnonymizeUserAsync(userId, ct);
         // Remove each membership edge only in the transaction that anonymizes its roster.
         // A timed-out worker therefore resumes at remaining groups instead of rescanning all history.
         while (true)

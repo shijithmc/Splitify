@@ -1,6 +1,6 @@
 # Hisaab infrastructure
 
-This CDK application synthesizes an HTTP API and two .NET 10 ARM64 Lambda functions using the real API and worker projects. It also defines a retained on-demand DynamoDB table with point-in-time recovery, two SQS work queues with dead-letter queues, a worker-failure queue, filtered DynamoDB stream wakeups, scheduled maintenance, bounded log retention and CloudWatch alarms. No deployment occurs during build, tests or synthesis.
+This CDK application synthesizes an HTTP API and three .NET 10 ARM64 Lambda functions using the real API and worker projects. It also defines a retained on-demand DynamoDB table with point-in-time recovery, three SQS work queues with dead-letter queues, a worker-failure queue, filtered DynamoDB stream wakeups, scheduled maintenance, bounded log retention and CloudWatch alarms. No deployment occurs during build, tests or synthesis.
 
 Run from the repository root:
 
@@ -26,3 +26,5 @@ The table uses `PK`, `SK`, numeric `Version`, JSON-string `Data`, and optional n
 The durable JSON adapter is for single-process local development. It serializes transactions under a per-path semaphore, checks every expected version before changing state, and writes through a temporary file followed by an atomic replacement. Use DynamoDB for multiple processes or hosted deployments. Pagination cursors are bound to the partition and prefix; callers must still authorize the requested partition. The adapter validates 100 distinct actions, 400 KiB item size and 4 MiB transaction size, including existing rows deleted or independently conditioned.
 
 The test suite verifies storage rollback, concurrent optimistic writes, idempotency rows, durable restart, limits, cursor isolation, AWS request construction and synthesized policies. It does not claim a live DynamoDB integration test, deployed IAM validation, real push delivery, provider/store verification, or load-tested SLOs. AWS deployment, billing accounts, alert routing and release gates remain operator work.
+
+Receipt media uses a private TLS-only encrypted retained S3 bucket. A dedicated 1536 MiB receipt Lambda has reserved concurrency four and consumes one-message SQS batches with maximum concurrency two. WORK#receipt-scan stream events dispatch due-time-aware wakeups, and one-minute maintenance repairs interrupted work and purges media. The API grants signed PUTs to quarantine and serves authorized image chunks; only the receipt worker normalizes and deletes media. Receipt logs use TEXT explicitly for CloudWatch EMF aggregate budget/circuit metrics. See [receipt operations](../../docs/runbooks/receipts.md) for WIF, model validation, budget, retention and release gates.

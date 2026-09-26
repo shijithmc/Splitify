@@ -10,6 +10,7 @@ using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Lambda.EventSources;
 using Amazon.CDK.AWS.Logs;
 using Amazon.CDK.AWS.SQS;
+using Amazon.CDK.AWS.S3;
 using Constructs;
 using Attribute = Amazon.CDK.AWS.DynamoDB.Attribute;
 using Function = Amazon.CDK.AWS.Lambda.Function;
@@ -49,6 +50,17 @@ public sealed class HisaabStack : Stack
         });
         var billingQueue = CreateQueue("Billing");
         var notificationQueue = CreateQueue("Notification");
+        var receiptQueue = CreateQueue("Receipt");
+        var receiptBucket = new Bucket(this, "ReceiptMedia", new BucketProps
+        {
+            Encryption = BucketEncryption.S3_MANAGED,
+            BlockPublicAccess = BlockPublicAccess.BLOCK_ALL,
+            EnforceSSL = true,
+            ObjectOwnership = ObjectOwnership.BUCKET_OWNER_ENFORCED,
+            Versioned = false,
+            RemovalPolicy = RemovalPolicy.RETAIN,
+            LifecycleRules = [new LifecycleRule { Id = "ExpireQuarantine", Prefix = "quarantine/", Expiration = Duration.Days(1), AbortIncompleteMultipartUploadAfter = Duration.Days(1) }]
+        });
         var workerFailureQueue = new Queue(this, "WorkerFailureQueue", new QueueProps
         {
             Encryption = QueueEncryption.SQS_MANAGED,
@@ -70,6 +82,8 @@ public sealed class HisaabStack : Stack
             ["Hisaab__SecretsArn"] = configSecret.ValueAsString,
             ["Hisaab__BillingQueueUrl"] = billingQueue.QueueUrl,
             ["Hisaab__NotificationQueueUrl"] = notificationQueue.QueueUrl
+            , ["Hisaab__Receipts__BucketName"] = receiptBucket.BucketName
+            , ["Hisaab__Receipts__QueueUrl"] = receiptQueue.QueueUrl
         };
         var api = new Function(this, "Api", new FunctionProps
         {
@@ -97,7 +111,50 @@ public sealed class HisaabStack : Stack
             RetryAttempts = 2,
             Tracing = Tracing.ACTIVE
         });
-        foreach (var function in new[] { api, worker })
+        var receiptLogs = new LogGroup(this, "ReceiptWorkerLogs", new LogGroupProps { Retention = RetentionDays.ONE_MONTH });
+        var receiptWorker = new Function(this, "ReceiptWorker", new FunctionProps
+        {
+            Runtime = Runtime.DOTNET_10, Architecture = Architecture.ARM_64,
+            Handler = "Hisaab.Workers::Hisaab.Workers.ReceiptFunction::HandleAsync",
+            Code = Code.FromAsset(workerAssetPath), MemorySize = 1536, Timeout = Duration.Seconds(60),
+            ReservedConcurrentExecutions = 4, Environment = environment, LogGroup = receiptLogs,
+            LoggingFormat = LoggingFormat.TEXT,
+            DeadLetterQueue = workerFailureQueue, RetryAttempts = 2, Tracing = Tracing.ACTIVE
+        });
+        receiptBucket.GrantPut(api, "quarantine/*");
+        receiptBucket.GrantRead(api, "images/*");
+        receiptBucket.GrantRead(api, "thumbs/*");
+        receiptWorker.AddToRolePolicy(new PolicyStatement(new PolicyStatementProps
+        {
+            Actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion"],
+            Resources = [receiptBucket.ArnForObjects("quarantine/*"), receiptBucket.ArnForObjects("images/*"), receiptBucket.ArnForObjects("thumbs/*")]
+        }));
+        receiptWorker.AddToRolePolicy(new PolicyStatement(new PolicyStatementProps
+        {
+            Actions = ["s3:ListBucketVersions"], Resources = [receiptBucket.BucketArn],
+            Conditions = new Dictionary<string, object> { ["StringLike"] = new Dictionary<string, object> { ["s3:prefix"] = new[] { "quarantine/*", "images/*", "thumbs/*" } } }
+        }));
+        receiptQueue.GrantSendMessages(receiptWorker);
+        receiptWorker.AddEventSource(new SqsEventSource(receiptQueue, new SqsEventSourceProps { BatchSize = 1, MaxConcurrency = 2 }));
+        receiptWorker.AddEventSource(new DynamoEventSource(table, new DynamoEventSourceProps
+        {
+            StartingPosition = StartingPosition.TRIM_HORIZON, BatchSize = 20, RetryAttempts = 3, BisectBatchOnError = true,
+            Filters = [FilterCriteria.Filter(new Dictionary<string, object>
+            {
+                ["eventName"] = new[] { "INSERT", "MODIFY" },
+                ["dynamodb"] = new Dictionary<string, object> { ["Keys"] = new Dictionary<string, object> { ["PK"] = new Dictionary<string, object> { ["S"] = new[] { "WORK#receipt-scan" } } } }
+            })], OnFailure = new SqsDlq(workerFailureQueue)
+        }));
+        ScheduleJob("ReceiptMaintenance", "receipt-maintenance", Duration.Minutes(1), receiptWorker, workerFailureQueue);
+        new Alarm(this, "ReceiptWorkerErrors", new AlarmProps { Metric = receiptWorker.MetricErrors(), Threshold = 1, EvaluationPeriods = 1, TreatMissingData = TreatMissingData.NOT_BREACHING });
+        new Alarm(this, "ReceiptQueueAge", new AlarmProps { Metric = receiptQueue.MetricApproximateAgeOfOldestMessage(), Threshold = 60, EvaluationPeriods = 1, TreatMissingData = TreatMissingData.NOT_BREACHING });
+        foreach (var metricName in new[] { "Budget80", "CircuitOpen" })
+            new Alarm(this, "Receipt" + metricName, new AlarmProps
+            {
+                Metric = new Metric(new MetricProps { Namespace = "Hisaab/Receipts", MetricName = metricName, Statistic = "Maximum", Period = Duration.Minutes(1) }),
+                Threshold = 1, EvaluationPeriods = 1, TreatMissingData = TreatMissingData.NOT_BREACHING
+            });
+        foreach (var function in new[] { api, worker, receiptWorker })
         {
             function.AddToRolePolicy(new PolicyStatement(new PolicyStatementProps
             {
@@ -108,7 +165,7 @@ public sealed class HisaabStack : Stack
         var secretPolicy = new CfnPolicy(this, "ConfigurationSecretAccess", new CfnPolicyProps
         {
             PolicyName = "ReadHisaabConfiguration",
-            Roles = [api.Role!.RoleName, worker.Role!.RoleName],
+            Roles = [api.Role!.RoleName, worker.Role!.RoleName, receiptWorker.Role!.RoleName],
             PolicyDocument = new Dictionary<string, object>
             {
                 ["Version"] = "2012-10-17",
@@ -213,6 +270,8 @@ public sealed class HisaabStack : Stack
         });
         new CfnOutput(this, "ApiUrl", new CfnOutputProps { Value = httpApi.ApiEndpoint });
         new CfnOutput(this, "TableName", new CfnOutputProps { Value = table.TableName });
+        new CfnOutput(this, "ReceiptBucketName", new CfnOutputProps { Value = receiptBucket.BucketName });
+        new CfnOutput(this, "ReceiptWorkerRoleArn", new CfnOutputProps { Value = receiptWorker.Role!.RoleArn });
     }
 
     private Queue CreateQueue(string name)

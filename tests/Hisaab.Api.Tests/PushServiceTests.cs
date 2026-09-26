@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Hisaab.Api.Identity;
+using Hisaab.Api.Receipts;
+using Hisaab.Domain.Receipts;
 using Hisaab.Api.Shared;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
@@ -125,6 +127,35 @@ public sealed class PushServiceTests
         await new PushService(store, provider, Config()).DeliverAsync(stored);
         Assert.Single(provider.Messages);
         _ = outbox;
+    }
+
+    [Fact]
+    public async Task ReceiptReadyPushOnlyReachesUploaderAndCarriesNoBillText()
+    {
+        var (store,_) = await SeedAsync();var now=DateTimeOffset.UtcNow;
+        await Put(store,"RECEIPT#receipt","META",new ReceiptRecord("receipt","g","ua","a","ready",true,[],[],now,now.AddDays(7)));
+        var outbox=StoreRow.Create("OUTBOX","ready-event",1,new{id="ready-event",groupId="g",kind="receipt_ready",actorId="system",description="Receipt ready",createdAt=now,entityId="receipt",recipientParticipantIds=new[]{"a"}});
+        using var provider=new FakePushProvider();await new PushService(store,provider,Config()).DeliverAsync(outbox);
+        Assert.Single(provider.Messages);var message=provider.Messages[0].GetProperty("message");Assert.Equal("a-token",message.GetProperty("token").GetString());Assert.Equal("receipt",message.GetProperty("data").GetProperty("receiptId").GetString());Assert.Equal("Your bill is ready to review.",message.GetProperty("notification").GetProperty("body").GetString());
+    }
+
+    [Fact]
+    public async Task ReceiptItemNamesRequireExplicitNotificationPreference()
+    {
+        var (store,outbox)=await SeedAsync();var config=Config();var now=DateTimeOffset.UtcNow;
+        var prior=(await store.GetAsync("GROUP#g","EXPENSE#e"))!;var expense=prior.Deserialize<Expense>() with{ReceiptId="receipt",ReceiptRevision=1};await store.TransactAsync([StoreMutation.Put(StoreRow.Create(prior.Pk,prior.Sk,2,expense),1)]);
+        var review=new ReceiptReview("Cafe",new(2026,9,26),"INR",100,[new("item","Paneer Tikka","1",100,100,["a","b"])],[],true);
+        var revision=new ReceiptRevision("receipt",1,review,expense.Shares,"hash",now);var bytes=JsonSerializer.SerializeToUtf8Bytes(revision,JsonDefaults.Options);
+        await Put(store,"RECEIPT#receipt","REVISION#0000000001#MANIFEST",new ReceiptRevisionManifest(1,1,bytes.Length,Convert.ToHexString(SHA256.HashData(bytes))));await Put(store,"RECEIPT#receipt","REVISION#0000000001#PAGE#00",new ReceiptRevisionPage(Convert.ToBase64String(bytes)));
+        var attachment=new ReceiptAttachmentService(store,new ReceiptQuotaService(store,config),config);using var provider=new FakePushProvider();
+        await new PushService(store,provider,config,attachment).DeliverAsync(outbox);Assert.DoesNotContain("Paneer",provider.Messages[0].GetRawText());
+        await Put(store,"USER#ub","PREFS",new NotificationPreferences(ReceiptDetails:true));
+        var second=StoreRow.Create("OUTBOX","second-event",1,new Activity("second-event","g","expense_updated","ua","expense updated",now,"e"));await new PushService(store,provider,config,attachment).DeliverAsync(second);
+        var body=provider.Messages[1].GetProperty("message").GetProperty("notification").GetProperty("body").GetString();Assert.Contains("1/2 Paneer Tikka",body);Assert.Contains("₹0.50",body);
+        await Put(store,"USER#ua","PREFS",new NotificationPreferences(ReceiptDetails:true));
+        var flag=StoreRow.Create("OUTBOX","flag-event",1,new{id="flag-event",groupId="g",kind="receipt_mismatch",actorId="ub",description="bill mismatch",createdAt=now,entityId="e",recipientParticipantIds=new[]{"a"}});
+        await new PushService(store,provider,config,attachment).DeliverAsync(flag);
+        Assert.Contains("Bill mismatch flagged.",provider.Messages[2].GetProperty("message").GetProperty("notification").GetProperty("body").GetString());
     }
 
     private static async Task<(LocalAtomicStore Store, StoreRow Outbox)> SeedAsync()

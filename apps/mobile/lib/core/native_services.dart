@@ -258,6 +258,8 @@ class BillingService {
 class PushService {
   StreamSubscription<String>? _tokens;
   StreamSubscription<RemoteMessage>? _messages;
+  StreamSubscription<RemoteMessage>? _opened;
+  void Function(Json)? onOpen;
   String? _deviceId;
   Future<void> enable(Repository repo, void Function() refresh) async {
     if (!AppConfig.pushEnabled || repo.isDemo) {
@@ -278,10 +280,16 @@ class PushService {
     if (token != null) await register(token);
     await _tokens?.cancel();
     await _messages?.cancel();
+    await _opened?.cancel();
     _tokens = FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       unawaited(register(token).catchError((Object _) {}));
     });
     _messages = FirebaseMessaging.onMessage.listen((_) => refresh());
+    _opened = FirebaseMessaging.onMessageOpenedApp.listen(
+      (message) => onOpen?.call(message.data),
+    );
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) onOpen?.call(initial.data);
   }
 
   Future<void> reconnect(Repository repo, void Function() refresh) async {
@@ -298,6 +306,8 @@ class PushService {
   Future<void> disconnect(Repository repo) async {
     await _tokens?.cancel();
     await _messages?.cancel();
+    await _opened?.cancel();
+    onOpen = null;
     _deviceId ??= (await SharedPreferences.getInstance()).getString(
       'hisaab.device',
     );

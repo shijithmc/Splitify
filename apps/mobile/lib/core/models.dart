@@ -69,6 +69,9 @@ class Expense {
   String get date => json['date'];
   String get mode => json['mode'];
   bool get deleted => json['deletedAt'] != null;
+  String? get receiptId => json['receiptId'];
+  String get displayMode =>
+      json['displaySplitKind'] == 'Items' ? 'Items' : mode;
   List<Json> get participants => rows(json['participants']);
   Map<String, int> get shares =>
       object(json['shares']).map((k, v) => MapEntry(k, v as int));
