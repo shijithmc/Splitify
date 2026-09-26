@@ -64,5 +64,6 @@ Backend tests cover ledger conservation, concurrent/replayed mutations, authoriz
 - [Configuration keys](.env.example): empty example only; never commit populated secrets.
 - [Support runbook](docs/runbooks/support.md): account/transaction lookup and audited, expiring grants.
 - [Accepted defaults](docs/decisions/0001-v1-defaults.md), [original plan](HISAAB_IMPLEMENTATION_PLAN.md), [unaltered product specification](docs/hisaab-product-spec.md).
+- [Snap & Split implementation plan](SNAP_SPLIT_IMPLEMENTATION_PLAN.md) and [unaltered feature specification](docs/snap-split-product-spec.md): proposed receipt scanning and itemised splitting; not implemented.
 
 No SnapStart, OpenSearch/Elasticsearch/AOSS/SearchCache or AWS WAF is allowed. No money moves through Hisaab; settlements are records only.
