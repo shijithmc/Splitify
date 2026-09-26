@@ -1,0 +1,47 @@
+name: Verify Hisaab
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.3xx'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: dotnet test Hisaab.slnx --configuration Release --disable-build-servers
+      - run: dotnet publish src/Hisaab.Api -c Release -r linux-arm64 --self-contained false -o artifacts/api
+      - run: dotnet publish src/Hisaab.Workers -c Release -r linux-arm64 --self-contained false -o artifacts/workers
+      - run: dotnet run --project infra/Hisaab.Cdk -c Release --no-build
+        env:
+          CDK_OUTDIR: artifacts/cdk
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - working-directory: apps/mobile
+        run: flutter pub get
+      - working-directory: apps/mobile
+        run: flutter analyze
+      - working-directory: apps/mobile
+        run: flutter test
+      - working-directory: apps/mobile
+        run: flutter test test/ad_lifecycle_test.dart --dart-define=ADS_ENABLED=true --dart-define=ADS_POLICY_REVIEWED=true --dart-define=ADMOB_ANDROID_BANNER_ID=test-banner
+      - working-directory: apps/mobile
+        run: flutter build apk --debug --dart-define=ENABLE_DEMO=true

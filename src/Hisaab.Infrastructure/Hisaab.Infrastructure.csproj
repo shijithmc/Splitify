@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Hisaab.Application/Hisaab.Application.csproj" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.104" />
+  </ItemGroup>
+</Project>

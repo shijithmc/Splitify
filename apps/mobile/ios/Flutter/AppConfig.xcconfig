@@ -1,0 +1,8 @@
+// Google-provided test application ID. Ads stay disabled by default in Dart.
+ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511
+GOOGLE_REVERSED_CLIENT_ID = app.hisaab.unconfigured
+// Optional local/CI configuration, never commit secrets or signing profiles.
+#include? "Local.xcconfig"
+
+// AdMob 13.10 imports its beta preloader header outside its module map.
+CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES

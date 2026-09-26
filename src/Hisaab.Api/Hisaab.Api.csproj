@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><AWSProjectType>Lambda</AWSProjectType></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.0.16" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.23.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
+    <ProjectReference Include="../Hisaab.Domain/Hisaab.Domain.csproj" />
+    <ProjectReference Include="../Hisaab.Application/Hisaab.Application.csproj" />
+    <ProjectReference Include="../Hisaab.Infrastructure/Hisaab.Infrastructure.csproj" />
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.0.0" />
+  </ItemGroup>
+</Project>
