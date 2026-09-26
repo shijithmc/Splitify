@@ -1,1 +1,12 @@
 codexworktree/
+**/bin/
+**/obj/
+**/.dart_tool/
+**/build/
+**/cdk.out/
+artifacts/
+.local/
+.env
+.env.*
+!.env.example
+.DS_Store

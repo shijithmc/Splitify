@@ -1,0 +1,18 @@
+{
+  "INVITE_HOST": "",
+  "API_BASE_URL": "https://api.your-domain.example",
+  "GOOGLE_CLIENT_ID": "",
+  "GOOGLE_SERVER_CLIENT_ID": "",
+  "APPLE_SERVICE_ID": "",
+  "APPLE_REDIRECT_URI": "",
+  "REVENUECAT_IOS_KEY": "",
+  "REVENUECAT_ANDROID_KEY": "",
+  "PRIVACY_URL": "",
+  "TERMS_URL": "",
+  "PUSH_ENABLED": false,
+  "ADS_ENABLED": false,
+  "ADS_POLICY_REVIEWED": false,
+  "ADMOB_IOS_BANNER_ID": "",
+  "ADMOB_ANDROID_BANNER_ID": "",
+  "ENABLE_DEMO": false
+}

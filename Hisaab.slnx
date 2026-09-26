@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/infra/">
+    <Project Path="infra/Hisaab.Cdk/Hisaab.Cdk.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Hisaab.Api/Hisaab.Api.csproj" />
+    <Project Path="src/Hisaab.Application/Hisaab.Application.csproj" />
+    <Project Path="src/Hisaab.Domain/Hisaab.Domain.csproj" />
+    <Project Path="src/Hisaab.Infrastructure/Hisaab.Infrastructure.csproj" />
+    <Project Path="src/Hisaab.Workers/Hisaab.Workers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hisaab.Api.Tests/Hisaab.Api.Tests.csproj" />
+    <Project Path="tests/Hisaab.Domain.Tests/Hisaab.Domain.Tests.csproj" />
+    <Project Path="tests/Hisaab.Infrastructure.Tests/Hisaab.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Hisaab.Support.Tests/Hisaab.Support.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Hisaab.Support/Hisaab.Support.csproj" />
+  </Folder>
+</Solution>

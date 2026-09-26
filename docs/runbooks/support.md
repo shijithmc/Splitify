@@ -1,0 +1,15 @@
+# Paid but still seeing ads
+
+Use the customer's Hisaab account UUID shown in Settings. Confirm that the store purchase and the currently signed-in Hisaab account are the intended combination. Never ask for passwords, ID tokens or receipt screenshots containing payment details.
+
+1. Ask the user to open Settings → Restore Purchases. The client requests provider restoration and the backend re-fetches RevenueCat state.
+2. Use an approved support IAM identity with narrowly scoped table GetItem/Query access: `dotnet run --project tools/Hisaab.Support -- lookup TABLE USER_UUID`. If only a transaction reference is available, run `dotnet run --project tools/Hisaab.Support -- lookup-transaction TABLE APP_STORE TRANSACTION_ID` (or `PLAY_STORE`). This resolves the stored webhook attribution, then prints that account's status and entitlement. Both original/current transaction IDs work after a matching webhook has arrived. No match does not prove the absence of a purchase.
+3. Inspect verification time, paid-through/grace date and sandbox environment. Audit history is the first 100 records in oldest-first order; `nextCursor` indicates more records. Check pending `WORK#billing` records and CloudWatch worker errors. Retry a failed queue message only after correcting the cause; billing re-fetch is idempotent. The transaction attribution is first-seen history and may be stale after a transfer: verify current ownership in RevenueCat before granting access or telling a customer which account owns the purchase.
+4. If the purchase belongs to a different app account, recover the original account. Never transfer a receipt or merge identity merely because email addresses match.
+5. An operator explicitly authorized for temporary grants may run `grant TABLE USER_UUID HOURS REASON OPERATOR --confirm`. The tool limits grants to seven days, requires an active account and writes an audit event. `revoke TABLE USER_UUID REASON OPERATOR --confirm` removes only the support override.
+
+The CLI uses the standard AWS credential chain. Do not put credentials in arguments, app bundles or source. Infrastructure does not automatically assign a support role; the account owner must grant the intended support identity scoped access before use. The tool never creates a subscription or cancels store billing.
+
+The HTTP API error-rate alarm uses API Gateway `5xx / Count × 100`, scoped to the API's `$default` stage. It alarms when server errors reach **0.5% in a five-minute period**, including errors returned as normal HTTP responses by API middleware. Lambda error alarms alone do not capture those responses. No-traffic periods do not breach. Connect the alarms to the approved on-call destination before launch and validate them using staged HTTP 5xx responses. See [support CLI usage](../../tools/Hisaab.Support/README.md) for IAM scope and attribution limitations.
+
+Rehearse the flow in staging with a known sandbox transaction and aim to complete it in under five minutes. Real merchant accounts, RevenueCat ownership rules, legal retention and production IAM remain release prerequisites.

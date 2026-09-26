@@ -1,6 +1,6 @@
 # Hisaab implementation plan
 
-Status: proposed plan; implementation has not started. Prepared 26 September 2026.
+Status: original plan prepared 26 September 2026; implementation authorized and started the same day. See [current implementation status](docs/IMPLEMENTATION_STATUS.md) for delivered source, deviations and unverified release gates. The planning language and acceptance matrix below are preserved as the original baseline.
 
 The repository currently contains only a README. This document turns the [supplied product specification](docs/hisaab-product-spec.md) into an implementation sequence. Producing this plan does not approve unresolved product decisions, create cloud resources, configure store products, or demonstrate that any acceptance criterion already passes.
 
