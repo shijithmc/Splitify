@@ -49,6 +49,11 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
   app_links: ^7.2.1
+  camera: ^0.12.1
+  file_picker: ^13.1.0
+  cryptography: ^2.9.0
+  image: ^4.9.1
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

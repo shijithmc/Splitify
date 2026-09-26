@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'config.dart';
 import 'demo_repository.dart';
@@ -8,6 +9,7 @@ import 'invite_links.dart';
 import 'models.dart';
 import 'native_services.dart';
 import 'repository.dart';
+import 'receipts.dart';
 
 class AppController extends ChangeNotifier {
   Repository? repository;
@@ -16,6 +18,38 @@ class AppController extends ChangeNotifier {
   AppController({BillingService? billing})
     : billing = billing ?? BillingService();
   int _accountEpoch = 0;
+  ReceiptCoordinator? _receipts;
+  ReceiptCoordinator get receipts {
+    final repo = repository!;
+    final account = userId, epoch = _accountEpoch;
+    return _receipts ??= ReceiptCoordinator(
+      repository: repo,
+      account: account,
+      current: () =>
+          signedIn &&
+          userId == account &&
+          _accountEpoch == epoch &&
+          identical(repository, repo),
+      foreground: () => foreground,
+    );
+  }
+
+  Json? pendingNotification;
+  void receiveNotification(Json data) {
+    if (!signedIn) return;
+    if (data['groupId'] is! String || (data['groupId'] as String).isEmpty) {
+      return;
+    }
+    pendingNotification = {...data, 'account': userId};
+    notifyListeners();
+  }
+
+  Json? takeNotification() {
+    final value = pendingNotification;
+    pendingNotification = null;
+    return value;
+  }
+
   final push = PushService();
   final inviteLinks = InviteLinkService();
   final _secure = const FlutterSecureStorage();
@@ -95,11 +129,17 @@ class AppController extends ChangeNotifier {
       return;
     }
     try {
+      push.onOpen = receiveNotification;
       await push.reconnect(repository!, () => refresh());
     } catch (_) {
       /* Permission/configuration stays visible in Settings. */
     }
     await restoreBillingState();
+    if (epoch == _accountEpoch &&
+        account == userId &&
+        identical(repo, repository)) {
+      unawaited(receipts.initialize().catchError((Object _) {}));
+    }
   }
 
   Future<void> restoreBillingState() async {
@@ -149,6 +189,8 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> startDemo() async {
+    await _receipts?.endSession();
+    _receipts = null;
     ++_accountEpoch;
     loading = true;
     error = null;
@@ -242,6 +284,12 @@ class AppController extends ChangeNotifier {
       final verified = await request('POST', '/billing/refresh');
       if (!currentAccount()) return;
       entitlement = verified;
+      if (_receipts != null) {
+        try {
+          await _receipts!.refreshAllowance();
+        } catch (_) {}
+        if (!currentAccount()) return;
+      }
       final status = (verified['status'] as String? ?? '').toLowerCase();
       if (verified['adFree'] == true ||
           [
@@ -329,6 +377,7 @@ class AppController extends ChangeNotifier {
       _billingRetry = null;
     } else {
       _scheduleBillingRetry();
+      if (_receipts != null) unawaited(_receipts!.pump());
     }
   }
 
@@ -344,6 +393,11 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout({bool deleted = false}) async {
     ++_accountEpoch;
+    pendingNotification = null;
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    await _receipts?.endSession();
+    _receipts = null;
     final storeSignOut = billing.signOut().then<void>(
       (_) {},
       onError: (Object _, StackTrace _) {},

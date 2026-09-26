@@ -17,3 +17,18 @@ The transaction result is the first recorded webhook attribution. It can be stal
 Read-only lookups require `dynamodb:GetItem` and `dynamodb:Query` on the chosen table, with any leading-key restrictions covering both `STORE#...` and the resolved `USER#...` partition. Grant/revoke additionally require conditional table writes and the separately approved support authorization. Grants expire in 1–168 hours and every mutation records a reason and operator identifier. The supplied operator text is an audit annotation, not a replacement for AWS IAM/CloudTrail identity.
 
 Do not paste lookup output into public tickets. Transaction IDs supplied as arguments can remain in shell history; follow the support team's approved handling policy. No provider secrets or payment credentials are needed for these lookups. See [the support runbook](../../docs/runbooks/support.md) for the paid-but-still-seeing-ads workflow and release prerequisites.
+
+Receipt support commands:
+
+```sh
+dotnet run --project tools/Hisaab.Support -- lookup-scan TABLE RECEIPT_UUID INC-123 OPERATOR
+dotnet run --project tools/Hisaab.Support -- receipt-control TABLE stop INC-123 OPERATOR --confirm
+dotnet run --project tools/Hisaab.Support -- receipt-control TABLE pause-free INC-123 OPERATOR --confirm
+dotnet run --project tools/Hisaab.Support -- receipt-control TABLE resume INC-123 OPERATOR --confirm
+```
+
+Every scan lookup, including a miss, writes an audit entry with the ticket/operator. Output includes only state, attempt count, sanitized error code, lease/quota/retention flags and timestamps. It excludes account/group IDs, merchant/items, blob keys, URLs, image bytes and raw provider output. There is no raw-output viewing command or retained failure payload. Support cannot trigger AI or extend quota through these commands.
+
+`stop` prevents new paid and free provider attempts. `pause-free` preserves an existing emergency stop. `resume` clears both dynamic controls; it cannot override deployment-level `EmergencyStop`, provider validation, missing budget configuration, the circuit breaker or the exhausted free budget. Already admitted provider calls can finish; stopping does not promise cancellation of a charge already sent to Google.
+
+Use separate least-privilege roles. Scan lookup needs `dynamodb:GetItem` scoped to `RECEIPT#*` and transactional writes scoped to `SUPPORT_AUDIT`. Runtime control needs `dynamodb:GetItem`/conditional transactional writes for `OPERATIONS` and `SUPPORT_AUDIT`. Neither role needs S3, Google credentials, receipt revision-page queries, user profiles or ledger writes. Restrict the exact table ARN and enforce operator identity through IAM/CloudTrail; the CLI's operator text is only an annotation. Audit access itself is a write and must not be represented as an unaudited read-only tool.

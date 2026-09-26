@@ -19,11 +19,23 @@ public sealed class InfrastructurePolicyTests
             var app = new App(new AppProps { Outdir = Path.Combine(root, "cdk.out") });
             var stack = new HisaabStack(app, "Hisaab-policy-test", assets, assets);
             var template = Template.FromStack(stack);
-            template.ResourceCountIs("AWS::Lambda::Function", 2);
+            template.ResourceCountIs("AWS::Lambda::Function", 3);
             template.ResourceCountIs("AWS::DynamoDB::Table", 1);
-            template.ResourceCountIs("AWS::SQS::Queue", 5);
-            template.ResourceCountIs("AWS::Events::Rule", 4);
-            template.ResourceCountIs("AWS::Lambda::EventSourceMapping", 3);
+            template.ResourceCountIs("AWS::SQS::Queue", 7);
+            template.ResourceCountIs("AWS::Events::Rule", 5);
+            template.ResourceCountIs("AWS::Lambda::EventSourceMapping", 5);
+            template.ResourceCountIs("AWS::S3::Bucket", 1);
+            template.HasResourceProperties("AWS::S3::Bucket", new Dictionary<string, object>
+            {
+                ["PublicAccessBlockConfiguration"] = new Dictionary<string, object>
+                { ["BlockPublicAcls"] = true, ["BlockPublicPolicy"] = true, ["IgnorePublicAcls"] = true, ["RestrictPublicBuckets"] = true },
+                ["BucketEncryption"] = new Dictionary<string, object>
+                { ["ServerSideEncryptionConfiguration"] = new object[] { new Dictionary<string, object> { ["ServerSideEncryptionByDefault"] = new Dictionary<string, object> { ["SSEAlgorithm"] = "AES256" } } } }
+            });
+            template.HasResourceProperties("AWS::Lambda::Function", new Dictionary<string, object>
+            {
+                ["Handler"] = "Hisaab.Workers::Hisaab.Workers.ReceiptFunction::HandleAsync", ["ReservedConcurrentExecutions"] = 4
+            });
             template.HasResourceProperties("AWS::DynamoDB::Table", new Dictionary<string, object>
             {
                 ["BillingMode"] = "PAY_PER_REQUEST",

@@ -16,7 +16,7 @@ Updated 26 September 2026. Source implementation follows the accepted defaults i
 
 Backend writes include account/session conditions and a durable response keyed by an idempotency UUID. Expired idempotency responses are eligible for deletion after 30 days; caller-generated expense/payment IDs still prevent duplicate entities. The 50-member cap counts retained ledger identities. Balances preserve direct debts, including zero-net cycles. Home totals aggregate across authorized groups.
 
-## Verification recorded
+## Original Hisaab verification recorded
 
 - Complete .NET Release suite: **168 passed** (63 domain, 75 API/security/workers, 23 storage/infrastructure, 7 support).
 - Real localhost HTTP smoke: health, development authentication, group/placeholders, equal ₹100 split, identical request replay, balance conservation and resolved actor/field-change history passed.
@@ -33,6 +33,22 @@ Backend writes include account/session conditions and a durable response keyed b
 - Existing separately created Hisaab accounts are **not consolidated**. Linking an unowned provider after proving both credentials works; an already-owned provider returns `account_merge_required`. Support must not manually rewrite ledger ownership or transfer a subscription without a separately reviewed recovery design.
 - Activity exposes the latest 100 events; cursor-based historical activity browsing, product analytics pipelines and public legal/help page hosting remain follow-up work. Expense listing is cursor-paginated at 25 records.
 - Optional multiple payers, simplify-debts, CSV export, categories/notes, offline writes and all other v2/v3 features remain outside this build.
+
+## Snap & Split delivered source
+
+- Native camera preview with bundled edge estimate, crop/retake, up to three images, local PDF/HEIC rasterization, orientation/metadata removal and ≤2048 px JPEG normalization. Encrypted per-account draft manifests/images support foreground upload and recovery after restart.
+- Mandatory editable review, original-script names, confidence warnings, manual INR conversion, total or item splits, deterministic exact-paise charge allocation and server preview. Immutable paged revisions attach atomically with expenses/balances. Existing manual expense APIs remain compatible and cannot silently rewrite receipt allocations.
+- Private shared image tickets bound to session/account, fresh ACL checks on every chunk, image removal, mismatch flags, duplicate warning, opt-in detailed notifications and receipt push routing.
+- Regional Vertex adapter, strict schema/parser, keyless WIF, queue/worker leases, bounded retries and successful-scan reservations. Five free /100 subscriber scans per IST month; independent upload quotas and configured budget/circuit/runtime stops.
+- S3/CDK source, delayed purge tombstones, account deletion/anonymization, audited support commands and a protected external-corpus evaluation tool. No raw provider output or production receipt corpus is retained for analytics.
+
+Mobile verification: **45 tests passed across configurations** (41 default-suite tests, plus four ads-enabled lifecycle tests); Flutter analyzer is clean. Two receipt widget journeys exercise explicit review/save, protected ad routes and invalidated review acknowledgement.
+
+Verification: **243 .NET tests passed** (81 domain, 123 API, 23 infrastructure, 16 support/evaluation). Real in-process HTTP upload → validation → preview → save → shared thumbnail and copied-ticket rejection passed. Linux ARM64 API/worker publishing and CDK synthesis passed. Android debug packaging and iOS arm64 simulator compilation passed; visual simulator interaction was unavailable because the host was locked. The maximum Unicode 150-item × 50-member assignment transaction and shared arithmetic vectors pass.
+
+**Still gated:** live Mumbai Vertex/WIF/token renewal, 200+ permissioned real-bill evaluation, production IAM/load/latency, billing reconciliation, physical-device camera/crop/HEIC/PDF/accessibility and signed push/store journeys. Scanning remains off by default. Flutter 3.44.6 already sets the effective Android minSdk to 24 (the existing maxOf expression is preserved). The original Android 23 support claim therefore needs a separately validated toolchain. Native HEIC works only on Android 28+ or iOS; older Android HEIC acceptance remains unresolved. Raw support diagnostics and production correction/conversion analytics are not implemented. Per-unit allocation and background OS upload jobs remain deferred as recorded in ADR 0002.
+
+See [receipt contract](api/receipts-contract.md), [operations](runbooks/receipts.md), [accepted implementation defaults](decisions/0002-snap-split.md) and [evaluation harness](../tools/Hisaab.ReceiptEval/README.md). No cloud deployment or real AI benchmark ran in this implementation.
 
 ## Release gates
 

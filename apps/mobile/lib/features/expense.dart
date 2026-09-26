@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../core/money.dart';
 import '../main.dart';
 import 'shared.dart';
+import 'receipts.dart';
 
 class ExpensePage extends StatefulWidget {
   final AppController controller;
@@ -106,6 +107,21 @@ class _ExpensePageState extends State<ExpensePage> {
             ),
           ),
           const SizedBox(height: 26),
+          if (widget.expense == null) ...[
+            OutlinedButton.icon(
+              onPressed: () async {
+                final saved = await openPage<bool>(
+                  context,
+                  widget.controller,
+                  ReceiptCapturePage(controller: widget.controller, group: g),
+                );
+                if (saved == true && context.mounted) Navigator.pop(context);
+              },
+              icon: const Icon(Icons.document_scanner_outlined),
+              label: const Text('Scan bill'),
+            ),
+            const SizedBox(height: 18),
+          ],
           TextField(
             controller: description,
             maxLength: 100,

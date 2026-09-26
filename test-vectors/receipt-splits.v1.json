@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "rounding": "Integer quotient; remainder to positive-weight participant IDs in ordinal order. Positive charges before negative charges; cap reductions at available balances and redistribute.",
+  "cases": [
+    {
+      "name": "one hundred rupees shared by three",
+      "activeMemberIds": ["a", "b", "c"],
+      "review": {
+        "merchant": "Example", "date": "2026-09-26", "sourceCurrency": "INR", "grandTotalPaise": 10000, "splitByItems": true,
+        "items": [{"id":"meal","name":"Meal","quantity":"1","unitPricePaise":10000,"lineTotalPaise":10000,"assigneeIds":["c","b","a"]}],
+        "charges": []
+      },
+      "expectedShares": {"a":3334,"b":3333,"c":3333},
+      "expectedDifferencePaise": 0
+    },
+    {
+      "name": "multiple tiny discounts exhaust a one-paise share safely",
+      "activeMemberIds": ["a", "b"],
+      "review": {
+        "merchant": "Example", "date": "2026-09-26", "sourceCurrency": "INR", "grandTotalPaise": 99, "splitByItems": true,
+        "items": [
+          {"id":"small","name":"Small","quantity":"1","unitPricePaise":1,"lineTotalPaise":1,"assigneeIds":["a"]},
+          {"id":"large","name":"Large","quantity":"1","unitPricePaise":100,"lineTotalPaise":100,"assigneeIds":["b"]}
+        ],
+        "charges": [{"id":"d1","name":"Discount","kind":"Discount","amountPaise":-1},{"id":"d2","name":"Discount","kind":"Discount","amountPaise":-1}]
+      },
+      "expectedShares": {"a":0,"b":99},
+      "expectedDifferencePaise": 0
+    },
+    {
+      "name": "tax included once with overridden service charge",
+      "activeMemberIds": ["a", "b"],
+      "review": {
+        "merchant": "Example", "date": "2026-09-26", "sourceCurrency": "INR", "grandTotalPaise": 360, "splitByItems": true,
+        "items": [
+          {"id":"first","name":"First","quantity":"1","unitPricePaise":100,"lineTotalPaise":100,"assigneeIds":["a"]},
+          {"id":"second","name":"Second","quantity":"1","unitPricePaise":200,"lineTotalPaise":200,"assigneeIds":["b"]}
+        ],
+        "charges": [
+          {"id":"included","name":"VAT included","kind":"Tax","amountPaise":50,"includedInItemPrices":true},
+          {"id":"gst","name":"GST","kind":"Tax","amountPaise":30},
+          {"id":"service","name":"Service","kind":"Service","amountPaise":30,"weights":{"a":1,"b":0}}
+        ]
+      },
+      "expectedShares": {"a":140,"b":220},
+      "expectedDifferencePaise": 0
+    },
+    {
+      "name": "positive difference funds discount before deductions",
+      "activeMemberIds": ["a", "b"],
+      "review": {
+        "merchant": "Example", "date": "2026-09-26", "sourceCurrency": "INR", "grandTotalPaise": 6, "splitByItems": true,
+        "items": [
+          {"id":"first","name":"First","quantity":"1","unitPricePaise":100,"lineTotalPaise":100,"assigneeIds":["a"]},
+          {"id":"second","name":"Second","quantity":"1","unitPricePaise":1,"lineTotalPaise":1,"assigneeIds":["b"]}
+        ],
+        "charges": [{"id":"discount","name":"Discount","kind":"Discount","amountPaise":-105,"weights":{"a":1}}]
+      },
+      "expectedShares": {"a":5,"b":1},
+      "expectedDifferencePaise": 10
+    },
+    {
+      "name": "negative round-off remains a visible exact component",
+      "activeMemberIds": ["a", "b"],
+      "review": {
+        "merchant": "Example", "date": "2026-09-26", "sourceCurrency": "INR", "grandTotalPaise": 999, "splitByItems": true,
+        "items": [{"id":"meal","name":"Meal","quantity":"1","unitPricePaise":1000,"lineTotalPaise":1000,"assigneeIds":["b","a"]}],
+        "charges": []
+      },
+      "expectedShares": {"a":499,"b":500},
+      "expectedDifferencePaise": -1
+    }
+  ]
+}

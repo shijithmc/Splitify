@@ -4,12 +4,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Hisaab.Api.Identity;
+using Hisaab.Api.Receipts;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
 
 namespace Hisaab.Api.Shared;
 
-public sealed class PushService(IAtomicStore store, IHttpClientFactory clients, IConfiguration config)
+public sealed class PushService(IAtomicStore store, IHttpClientFactory clients, IConfiguration config, ReceiptAttachmentService? receipts = null)
 {
     private readonly SemaphoreSlim _tokenGate = new(1, 1);
     private string? _accessToken;
@@ -18,7 +19,7 @@ public sealed class PushService(IAtomicStore store, IHttpClientFactory clients, 
     public async Task DeliverAsync(StoreRow outbox, CancellationToken ct = default)
     {
         var activity = outbox.Deserialize<Activity>();
-        var category = activity.Kind.StartsWith("expense_", StringComparison.Ordinal) ? "expenses"
+        var category = (activity.Kind.StartsWith("expense_", StringComparison.Ordinal) || activity.Kind.StartsWith("receipt_", StringComparison.Ordinal)) ? "expenses"
             : activity.Kind.StartsWith("payment_", StringComparison.Ordinal) ? "payments"
             : activity.Kind.StartsWith("invite_", StringComparison.Ordinal) ? "invites" : null;
         if (category is null) return;
@@ -41,6 +42,36 @@ public sealed class PushService(IAtomicStore store, IHttpClientFactory clients, 
             foreach (var device in devices.Items)
                 await DeliverDeviceAsync(activity, category, account, preferenceRow, device, ct);
         }
+    }
+
+    private async Task<(string Body,string? ReceiptId,string? ExpenseId)?> NotificationContentAsync(Activity activity,string userId,CancellationToken ct)
+    {
+        var groupRow=await store.GetAsync($"GROUP#{activity.GroupId}","META",ct);var group=groupRow?.Deserialize<Group>();
+        var member=group?.Members.SingleOrDefault(m=>m.UserId==userId&&!m.HasLeft&&!m.IsDeleted);
+        var account=await store.GetAsync($"USER#{userId}","PROFILE",ct);
+        if(group is null||group.Deleted||member is null||account?.Deserialize<UserAccount>().Status!="active")return null;
+        var preferences=(await store.GetAsync($"USER#{userId}","PREFS",ct))?.Deserialize<NotificationPreferences>()??new();
+        var category=activity.Kind.StartsWith("payment_",StringComparison.Ordinal)?"payments":activity.Kind.StartsWith("invite_",StringComparison.Ordinal)?"invites":"expenses";
+        if(!Enabled(preferences,category))return null;
+        if(activity.Kind=="receipt_ready")
+        {
+            var ready=(await store.GetAsync($"RECEIPT#{activity.EntityId}","META",ct))?.Deserialize<ReceiptRecord>();
+            if(ready is null||ready.UploaderId!=userId||ready.State!="ready"||ready.ExpenseId is not null||ready.ImagesRemoved)return null;
+            return("Your bill is ready to review.",ready.Id,null);
+        }
+        var expense=(await store.GetAsync($"GROUP#{activity.GroupId}",$"EXPENSE#{activity.EntityId}",ct))?.Deserialize<Expense>();
+        var body=activity.Kind=="receipt_mismatch"?"A participant flagged a bill mismatch. Open Hisaab to review it.":"You have a new shared-expense update. Open Hisaab to view it.";
+        if(preferences.ReceiptDetails&&receipts is not null&&expense is {ReceiptId:not null,ReceiptRevision:>0,DeletedAt:null}&&expense.Shares.TryGetValue(member.Id,out var share))
+        {
+            var revision=await receipts.ReadRevisionAsync(expense.ReceiptId,expense.ReceiptRevision.Value,ct);
+            var items=revision.Review.Items.Where(i=>i.AssigneeIds.Contains(member.Id,StringComparer.Ordinal)&&!i.Ignored).Select(i=>i.AssigneeIds.Count>1?$"1/{i.AssigneeIds.Count} {i.Name}":i.Name).Take(3);
+            var names=string.Join(", ",items);if(names.Length>150)names=names[..150]+"…";
+            body=(activity.Kind=="receipt_mismatch"?"Bill mismatch flagged. ":"")+$"Your share is {Money.Format(share)}"+(names.Length>0?$" for {names}":"")+(revision.Review.Charges.Count>0?" (including charges).":".");
+            // Reads above can cross membership/preference changes; recheck before exposing details.
+            var freshGroup=await store.GetAsync(groupRow!.Pk,groupRow.Sk,ct);var freshPrefs=(await store.GetAsync($"USER#{userId}","PREFS",ct))?.Deserialize<NotificationPreferences>()??new();
+            if(freshGroup?.Version!=groupRow.Version||!freshPrefs.ReceiptDetails||!freshPrefs.Expenses)return null;
+        }
+        return(body,expense?.ReceiptId,expense?.Id);
     }
 
     private async Task<HashSet<string>> RecipientParticipantsAsync(StoreRow outbox, Activity activity, Group group, CancellationToken ct)
@@ -97,6 +128,8 @@ public sealed class PushService(IAtomicStore store, IHttpClientFactory clients, 
         try
         {
             var accessToken = await AccessTokenAsync(credentials, ct);
+            var content = await NotificationContentAsync(activity, user.Id, ct);
+            if (content is null) return;
             using var request = new HttpRequestMessage(HttpMethod.Post,
                 $"https://fcm.googleapis.com/v1/projects/{Uri.EscapeDataString(credentials.ProjectId)}/messages:send");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -105,8 +138,8 @@ public sealed class PushService(IAtomicStore store, IHttpClientFactory clients, 
                 message = new
                 {
                     token,
-                    notification = new { title = "Hisaab", body = "You have a new shared-expense update. Open Hisaab to view it." },
-                    data = new { eventId = activity.Id, groupId = activity.GroupId, category },
+                    notification = new { title = "Hisaab", body = content.Value.Body },
+                    data = new { eventId = activity.Id, groupId = activity.GroupId, category, kind = activity.Kind, receiptId = content.Value.ReceiptId ?? "", expenseId = content.Value.ExpenseId ?? "" },
                     android = new { notification = new { tag = activity.Id } },
                     apns = new { headers = new Dictionary<string, string> { ["apns-collapse-id"] = activity.Id } }
                 }

@@ -9,6 +9,8 @@ import '../main.dart';
 import 'group.dart';
 import 'settings.dart';
 import 'shared.dart';
+import 'receipts.dart';
+import 'receipt_viewer.dart';
 
 class AppShell extends StatefulWidget {
   final AppController controller;
@@ -20,6 +22,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Timer? _poll;
   bool _active = true;
+  bool _openingNotification = false;
   AppController get c => widget.controller;
   @override
   void initState() {
@@ -54,6 +57,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
       if (!c.signedIn) return Welcome(controller: c);
+      if (c.pendingNotification != null &&
+          !_openingNotification &&
+          c.protectedDepth == 0) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _openNotification(),
+        );
+      }
       final pages = [
         _home(),
         _groups(),
@@ -224,6 +234,57 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       );
     },
   );
+
+  Future<void> _openNotification() async {
+    if (!mounted || _openingNotification || c.protectedDepth != 0) return;
+    final payload = c.takeNotification();
+    if (payload == null || payload['account'] != c.userId) return;
+    _openingNotification = true;
+    final account = c.userId;
+    try {
+      final group = Group.from(
+        await c.request('GET', '/groups/${payload['groupId']}'),
+      );
+      if (!mounted || c.userId != account) return;
+      final id = payload['receiptId'];
+      if (id is String && id.isNotEmpty) {
+        final status = await c.receipts.get(id);
+        if (!mounted || c.userId != account) return;
+        if (status['expenseId'] == null) {
+          await openPage(
+            context,
+            c,
+            ReceiptCapturePage(controller: c, group: group, receiptId: id),
+          );
+        } else {
+          final expense = Expense(
+            await c.request(
+              'GET',
+              '/groups/${group.id}/expenses/${status['expenseId']}',
+            ),
+          );
+          if (!mounted || c.userId != account) return;
+          await openPage(
+            context,
+            c,
+            ReceiptViewerPage(
+              controller: c,
+              group: group,
+              receiptId: id,
+              expense: expense,
+            ),
+          );
+        }
+      } else {
+        await openPage(context, c, GroupPage(controller: c, groupId: group.id));
+      }
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      _openingNotification = false;
+    }
+  }
+
   Widget _home() {
     final net = c.balances['netPaise'] as int? ?? 0;
     return PageBody(

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'models.dart';
 import 'money.dart';
 import 'repository.dart';
+import 'receipt_preview.dart';
 
 /// An isolated, clearly labelled local playground. Never called by ApiRepository.
 class DemoRepository implements Repository {
@@ -268,6 +269,17 @@ class DemoRepository implements Repository {
       }
       if (resource == 'expenses') {
         if (method == 'GET') {
+          if (parts.length == 4) {
+            final expense = list('expenses')
+                .where(
+                  (e) => e['groupId'] == group['id'] && e['id'] == parts[3],
+                )
+                .firstOrNull;
+            if (expense == null) {
+              throw ApiFailure('Expense not found.', status: 404);
+            }
+            return object(expense);
+          }
           final all =
               list(
                   'expenses',
@@ -305,11 +317,14 @@ class DemoRepository implements Repository {
             for (final p in rows(value['participants']))
               p['participantId'] as String: p['value'] as int,
           };
-          final shares = splitAmount(
-            value['amountPaise'],
-            value['mode'],
-            inputs,
-          );
+          var shares = splitAmount(value['amountPaise'], value['mode'], inputs);
+          final confirmation = object(value['receipt']);
+          final receiptReview = object(confirmation['review']);
+          if (receiptReview['splitByItems'] == true) {
+            shares = object(
+              estimateReceipt(receiptReview)['shares'],
+            ).map((k, v) => MapEntry(k, v as int));
+          }
           expense = {
             ...value,
             'groupId': group['id'],
@@ -317,6 +332,13 @@ class DemoRepository implements Repository {
             'version': old == null ? 1 : old['version'] + 1,
             'createdBy': 'demo-you',
             'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            if (confirmation.isNotEmpty) 'receiptId': confirmation['receiptId'],
+            if (confirmation.isNotEmpty)
+              'receiptRevision': old == null ? 1 : old['version'] + 1,
+            if (confirmation.isNotEmpty)
+              'displaySplitKind': receiptReview['splitByItems'] == true
+                  ? 'Items'
+                  : 'Total',
           };
         }
         _put('expenses', expense);

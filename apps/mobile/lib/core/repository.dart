@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -93,15 +94,143 @@ class ApiRepository implements Repository {
   }
 
   Future<void> _refresh() async {
+    final previous = _session;
     try {
       final session = await _send('POST', '/auth/refresh', {
         'refreshToken': _session!['refreshToken'],
       }, const Uuid().v4());
+      if (_closed ||
+          !identical(previous, _session) ||
+          session['user']?['id'] != previous?['user']?['id']) {
+        throw ApiFailure('Account changed. Please sign in again.', status: 401);
+      }
       _session = session;
       await storage.write(key: 'hisaab.session', value: jsonEncode(session));
     } finally {
       _refreshing = null;
     }
+  }
+
+  /// Receipt drafts persist their own command UUIDs. Sensitive receipt reads
+  /// deliberately bypass the general offline JSON cache.
+  Future<Json> receiptRequest(
+    String method,
+    String path,
+    Json? data,
+    String key,
+  ) async {
+    final account = _account;
+    try {
+      Json result;
+      try {
+        result = await _send(method, path, data, key);
+      } on ApiFailure catch (error) {
+        if (error.status != 401 || _session == null) rethrow;
+        await (_refreshing ??= _refresh());
+        result = await _send(method, path, data, key);
+      }
+      if (_closed || account != _account) {
+        throw ApiFailure('Account changed.', status: 401);
+      }
+      _offline = false;
+      return result;
+    } on SocketException {
+      return _networkFailure(method, path);
+    } on http.ClientException {
+      return _networkFailure(method, path);
+    } on TimeoutException {
+      return _networkFailure(method, path);
+    }
+  }
+
+  Future<void> uploadReceipt(
+    Json upload,
+    Uint8List bytes,
+    void Function(double) progress,
+  ) async {
+    final account = _account;
+    if (_closed || account.isEmpty) {
+      throw ApiFailure('Sign in again.', status: 401);
+    }
+    var uri = Uri.parse(upload['url']);
+    final api = Uri.parse(baseUrl);
+    final localUpload =
+        !uri.hasScheme &&
+        !uri.hasAuthority &&
+        uri.path.startsWith('/v1/receipts/');
+    if (localUpload) uri = api.resolveUri(uri);
+    if (uri.scheme != 'https' &&
+        !(uri.scheme == 'http' &&
+            uri.host == api.host &&
+            api.scheme == 'http')) {
+      throw ApiFailure('Unsafe receipt upload URL.');
+    }
+    final request = http.StreamedRequest(upload['method'] ?? 'PUT', uri);
+    request.contentLength = bytes.length;
+    request.headers.addAll(
+      object(upload['headers']).map((k, v) => MapEntry(k, '$v')),
+    );
+    if (localUpload) {
+      request.headers['Authorization'] = 'Bearer ${_session?['accessToken']}';
+    }
+    // Upload authorization is supplied by the server; never forward our session
+    // to S3 or another upload origin.
+    final response = client.send(request);
+    for (var offset = 0; offset < bytes.length; offset += 65536) {
+      if (_closed || account != _account) {
+        await request.sink.close();
+        throw ApiFailure('Account changed.', status: 401);
+      }
+      final end = (offset + 65536).clamp(0, bytes.length);
+      request.sink.add(bytes.sublist(offset, end));
+      progress(end / bytes.length);
+    }
+    await request.sink.close();
+    final result = await response.timeout(const Duration(seconds: 90));
+    await result.stream.drain<void>();
+    if (_closed || account != _account) {
+      throw ApiFailure('Account changed.', status: 401);
+    }
+    if (result.statusCode >= 400) {
+      throw ApiFailure(
+        'Upload expired or failed. Retry when connected.',
+        code: 'upload_failed',
+      );
+    }
+  }
+
+  Future<Uint8List> receiptBytes(String path) async {
+    final account = _account;
+    Future<http.Response> send() async => client
+        .get(
+          Uri.parse('$baseUrl/v1$path'),
+          headers: {
+            'Authorization': 'Bearer ${_session?['accessToken']}',
+            'Cache-Control': 'no-store',
+          },
+        )
+        .timeout(const Duration(seconds: 30));
+    if (_closed || account.isEmpty) {
+      throw ApiFailure('Sign in again.', status: 401);
+    }
+    var result = await send();
+    if (result.statusCode == 401 && !_closed) {
+      await (_refreshing ??= _refresh());
+      result = await send();
+    }
+    if (_closed || account != _account) {
+      throw ApiFailure('Account changed.', status: 401);
+    }
+    if (result.statusCode >= 400) {
+      throw ApiFailure(
+        'Receipt image is unavailable. Refresh to check access.',
+        status: result.statusCode,
+      );
+    }
+    if (result.bodyBytes.length > 1048576) {
+      throw ApiFailure('Receipt image response exceeded its limit.');
+    }
+    return result.bodyBytes;
   }
 
   @override

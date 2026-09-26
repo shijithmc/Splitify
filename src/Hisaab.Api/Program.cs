@@ -6,6 +6,8 @@ using Hisaab.Api.Billing;
 using Hisaab.Api.Contracts;
 using Hisaab.Api.Identity;
 using Hisaab.Api.Ledger;
+using Hisaab.Api.Receipts;
+using Hisaab.Api.Receipts.Infrastructure;
 using Hisaab.Api.Shared;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
@@ -13,6 +15,10 @@ using Hisaab.Infrastructure.Storage;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+// Request-start diagnostics include query strings (receipt tickets). Keep transport
+// logs at Warning; application failures log only type and correlation identifier.
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
 await ConfigurationSecrets.LoadAsync(builder.Configuration);
 if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Hisaab:EncryptionKey"]))
 {
@@ -21,7 +27,7 @@ if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Con
     if (!File.Exists(keyPath)) { try { var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write }; if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite; using var file = new FileStream(keyPath, options); using var writer = new StreamWriter(file); writer.Write(Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))); } catch (IOException) when (File.Exists(keyPath)) { } }
     builder.Configuration["Hisaab:EncryptionKey"] = File.ReadAllText(keyPath);
 }
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 128 * 1024);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 2048 * 1024);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 builder.Services.AddHttpClient().ConfigureHttpClientDefaults(options => options.ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(15)));
@@ -38,6 +44,11 @@ builder.Services.AddSingleton<IdentityService>(); builder.Services.AddSingleton<
 builder.Services.AddSingleton<CommandExecutor>(); builder.Services.AddSingleton<LedgerApplication>();
 builder.Services.AddSingleton<AccountDeletionService>(); builder.Services.AddSingleton<BackgroundJobs>();
 builder.Services.AddSingleton<PushService>();
+builder.Services.AddSingleton<ReceiptAccess>(); builder.Services.AddSingleton<ReceiptDocuments>();
+builder.Services.AddSingleton<ReceiptQuotaService>(); builder.Services.AddSingleton<ReceiptBudgetService>();
+builder.Services.AddSingleton<ReceiptAttachmentService>(); builder.Services.AddSingleton<ReceiptService>();
+builder.Services.AddSingleton<ReceiptLifecycle>(); builder.Services.AddSingleton<ReceiptWorker>();
+builder.Services.AddReceiptInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = 429;
@@ -98,6 +109,7 @@ app.MapPost("/v1/invites/accept", (HttpContext ctx, AcceptInviteRequest input, L
 app.MapPost("/v1/groups/{id}/leave", (HttpContext ctx, string id, LeaveRequest input, LedgerApplication ledger, CancellationToken ct) => ledger.LeaveAsync(Current(ctx), Key(ctx), id, input, ct));
 app.MapDelete("/v1/groups/{id}", async (HttpContext ctx, string id, LedgerApplication ledger, CancellationToken ct) => { var input = await ctx.Request.ReadFromJsonAsync<VersionRequest>(ct) ?? new(0); return await ledger.DeleteGroupAsync(Current(ctx), Key(ctx), id, input.Version, ct); });
 app.MapGet("/v1/groups/{id}/expenses", (HttpContext ctx, string id, string? cursor, LedgerApplication ledger, CancellationToken ct) => ledger.ExpensesAsync(id, Current(ctx).User.Id, cursor, ct));
+app.MapGet("/v1/groups/{id}/expenses/{expenseId}", (HttpContext ctx, string id, string expenseId, LedgerApplication ledger, CancellationToken ct) => ledger.ExpenseAsync(id, expenseId, Current(ctx).User.Id, ct));
 app.MapPost("/v1/splits/preview", (SplitRequest input) => SplitEngine.Calculate(input.AmountPaise, input.Mode, input.Participants));
 app.MapPost("/v1/groups/{id}/expenses", (HttpContext ctx, string id, ExpenseRequest input, LedgerApplication ledger, CancellationToken ct) => ledger.SaveExpenseAsync(Current(ctx), Key(ctx), id, input, false, ct));
 app.MapPut("/v1/groups/{id}/expenses/{expenseId}", (HttpContext ctx, string id, string expenseId, ExpenseRequest input, LedgerApplication ledger, CancellationToken ct) => { if (input.Id != expenseId) throw new DomainException(422, "id_mismatch", "Expense ID does not match the URL."); return ledger.SaveExpenseAsync(Current(ctx), Key(ctx), id, input, true, ct); });
@@ -120,5 +132,7 @@ app.MapPost("/v1/devices", (HttpContext ctx, DeviceRequest input, IAtomicStore s
     return new(new { registered = true }, [StoreMutation.Put(StoreRow.Create(pk, $"DEVICE#{input.Id}", (row?.Version ?? 0) + 1, new { input.Id, input.Token, input.Platform, sessionHash = Current(ctx).SessionHash }), row?.Version)]);
 }, ct));
 app.MapDelete("/v1/devices/{id}", (HttpContext ctx, string id, IAtomicStore store, CommandExecutor commands, CancellationToken ct) => commands.ExecuteAsync(Current(ctx), Key(ctx), $"device:delete:{id}", new { id }, async () => { var row = await store.GetAsync($"USER#{Current(ctx).User.Id}", $"DEVICE#{id}", ct); return new(new { deleted = true }, row is null ? [] : [StoreMutation.Delete(row.Pk, row.Sk, row.Version)]); }, ct));
+app.MapReceipts();
+app.MapReceiptInfrastructure();
 app.Run();
 public partial class Program;
