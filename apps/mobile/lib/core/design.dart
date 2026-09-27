@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 
 /// Shared tokens from the approved illustrated mobile design.
 abstract final class HisaabColors {
-  static const primary = Color(0xFF2854DC);
-  static const ink = Color(0xFF202E45);
-  static const muted = Color(0xFF526078);
-  static const surface = Color(0xFFFBFCFE);
-  static const teal = Color(0xFF1E474C);
-  static const mint = Color(0xFFE5F4EC);
-  static const peach = Color(0xFFFFF0E5);
-  static const lilac = Color(0xFFEEEAFB);
-  static const line = Color(0xFFE1E6EF);
-  static const positive = Color(0xFF206A59);
-  static const warning = Color(0xFF93442E);
+  static const primary = Color(0xFF173F35);
+  static const deep = Color(0xFF12392F);
+  static const ink = Color(0xFF203C32);
+  static const muted = Color(0xFF52645B);
+  static const surface = Color(0xFFFAF9F4);
+  static const teal = primary;
+  static const lime = Color(0xFFD8F36A);
+  static const mint = Color(0xFFECF3D9);
+  static const peach = Color(0xFFF8DFCB);
+  static const lilac = Color(0xFFE4E0EF);
+  static const line = Color(0xFFDFE5D9);
+  static const positive = Color(0xFF37694D);
+  static const warning = Color(0xFF9D4D30);
+  static const balanceAmount = Color(0xFFEDFFB1);
+  static const illustrationBackground = Color(0xFFF3F0E5);
+  static const fieldBorder = Color(0xFFCCD9C5);
 }
 
 abstract final class HisaabTheme {
@@ -20,6 +25,7 @@ abstract final class HisaabTheme {
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'WorkSans',
+      fontFamilyFallback: const ['WorkSans'],
       scaffoldBackgroundColor: HisaabColors.surface,
       colorScheme: ColorScheme.fromSeed(
         seedColor: HisaabColors.primary,
@@ -28,7 +34,11 @@ abstract final class HisaabTheme {
         surface: HisaabColors.surface,
         onSurface: HisaabColors.ink,
         onSurfaceVariant: HisaabColors.muted,
-        outline: const Color(0xFFB6C3D8),
+        secondary: HisaabColors.positive,
+        secondaryContainer: HisaabColors.mint,
+        onSecondaryContainer: HisaabColors.ink,
+        tertiaryContainer: HisaabColors.lilac,
+        outline: HisaabColors.fieldBorder,
         outlineVariant: HisaabColors.line,
         error: HisaabColors.warning,
       ),
@@ -42,53 +52,55 @@ abstract final class HisaabTheme {
       letterSpacing: -.5,
     );
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(15),
     );
     return base.copyWith(
-      textTheme: base.textTheme.copyWith(
-        displayLarge: heading(48),
-        displayMedium: heading(42),
-        displaySmall: heading(36),
-        headlineLarge: heading(32),
-        headlineMedium: heading(28),
-        headlineSmall: heading(24),
-        titleLarge: heading(21),
-        titleMedium: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: HisaabColors.ink,
-          height: 1.4,
-        ),
-        bodyLarge: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          height: 1.5,
-          color: HisaabColors.ink,
-        ),
-        bodyMedium: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          height: 1.5,
-          color: HisaabColors.ink,
-        ),
-        bodySmall: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 14,
-          height: 1.5,
-          color: HisaabColors.muted,
-        ),
-        labelLarge: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-        labelMedium: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      textTheme: base.textTheme
+          .copyWith(
+            displayLarge: heading(48),
+            displayMedium: heading(42),
+            displaySmall: heading(36),
+            headlineLarge: heading(32),
+            headlineMedium: heading(28),
+            headlineSmall: heading(24),
+            titleLarge: heading(21),
+            titleMedium: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: HisaabColors.ink,
+              height: 1.4,
+            ),
+            bodyLarge: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              height: 1.5,
+              color: HisaabColors.ink,
+            ),
+            bodyMedium: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              height: 1.5,
+              color: HisaabColors.ink,
+            ),
+            bodySmall: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 14,
+              height: 1.5,
+              color: HisaabColors.muted,
+            ),
+            labelLarge: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            labelMedium: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          )
+          .apply(fontFamilyFallback: const ['WorkSans']),
       appBarTheme: AppBarTheme(
         backgroundColor: HisaabColors.surface,
         foregroundColor: HisaabColors.teal,
@@ -101,7 +113,7 @@ abstract final class HisaabTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(21),
           side: const BorderSide(color: HisaabColors.line),
         ),
       ),
@@ -112,13 +124,13 @@ abstract final class HisaabTheme {
         helperStyle: const TextStyle(fontSize: 14, height: 1.5),
         errorStyle: const TextStyle(fontSize: 14, height: 1.5),
         errorMaxLines: 3,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(13)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFCAD6E7)),
+          borderRadius: BorderRadius.circular(13),
+          borderSide: const BorderSide(color: HisaabColors.fieldBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(13),
           borderSide: const BorderSide(color: HisaabColors.primary, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(
@@ -142,7 +154,7 @@ abstract final class HisaabTheme {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(48, 52),
           shape: shape,
-          side: const BorderSide(color: Color(0xFFCAD6E7)),
+          side: const BorderSide(color: HisaabColors.fieldBorder),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
       ),
@@ -180,7 +192,7 @@ abstract final class HisaabTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
-        indicatorColor: const Color(0xFFE8EEFD),
+        indicatorColor: HisaabColors.mint,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontFamily: 'WorkSans',
@@ -203,9 +215,14 @@ abstract final class HisaabTheme {
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: Colors.white,
-        selectedColor: const Color(0xFFE8EEFD),
+        selectedColor: HisaabColors.mint,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         side: const BorderSide(color: HisaabColors.line),
-        labelStyle: const TextStyle(fontFamily: 'WorkSans', fontSize: 14),
+        labelStyle: const TextStyle(
+          fontFamily: 'WorkSans',
+          fontSize: 14,
+          color: HisaabColors.ink,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       ),
       snackBarTheme: SnackBarThemeData(

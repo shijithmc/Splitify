@@ -6,7 +6,9 @@ Flutter app for iOS and Android. Includes onboarding, native Google/Apple identi
 
 The approved illustrated design is implemented across the app's supported flows: welcome/sign-in, Home and group lists, expense entry and split review, group activity, payment recording, receipt capture/review/assignment/viewing, settings and the annual plan. Home has shortcuts for expense entry, group-specific bill scanning and payment recording. All amounts, member details, scan allowances and store prices come from the current controller/repository.
 
-`lib/core/design.dart` defines the cobalt/teal palette, Material 3 controls and bundled Outfit/Work Sans fonts. `PageBody` constrains reading width on tablets, while forms and camera controls remain scrollable at larger text sizes. Asset provenance and font licences are in `assets/`.
+`lib/core/design.dart` defines the evergreen, lime and warm ivory palette, Material 3 controls and bundled Outfit/Work Sans fonts. Editorial illustrations accompany welcome, group and receipt screens. `PageBody` constrains reading width on tablets, while forms and camera controls remain scrollable at larger text sizes. Asset provenance and font licences are in `assets/`.
+
+Expense entry includes a calculator with exact decimal arithmetic, standard operator precedence and final rounding to the nearest paise. Confirming returns the amount to the existing split preview; Back leaves the expense unchanged. The save action remains visible below the scrollable form. The annual plan includes a clear return to the free account experience.
 
 The mockup gallery also contains proposed expanded-v1 flows. This UI change does not implement their backend contracts: multiple payers, expense-level settlement/netting, live UPI handoff, recurrence, comments/search/export and lifetime purchases remain governed by `V1_REVISION_IMPLEMENTATION_PLAN.md`. The existing payment flow records an already-made payment; it does not move money. The annual plan uses the store's localized price and existing purchase safeguards.
 

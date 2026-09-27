@@ -148,52 +148,70 @@ void main() {
     controller.receiptOverride?.dispose();
     controller.dispose();
   });
-  testWidgets('add expense previews conserved paise and saves to its group', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({});
-    final controller = ReceiptTestController();
-    await controller.startDemo();
-    controller.receiptOverride = ReceiptCoordinator(
-      repository: controller.repository!,
-      account: controller.userId,
-      current: () => controller.signedIn,
-      foreground: () => true,
-      store: MemoryReceiptStore(),
-    );
-    await tester.pumpWidget(HisaabApp(controller: controller));
-    await tester.tap(find.text('Groups'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Goa, here we come'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add expense'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), 'Test chai');
-    await tester.enterText(find.byType(TextField).at(1), '100');
-    await tester.scrollUntilVisible(
-      find.text('₹33.34'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('₹33.34'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Save expense'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save expense'));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Test chai'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('Test chai'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-    controller.receiptOverride?.dispose();
-    controller.dispose();
-  });
+  testWidgets(
+    'calculator amount previews conserved paise and saves to its group',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = ReceiptTestController();
+      await controller.startDemo();
+      controller.receiptOverride = ReceiptCoordinator(
+        repository: controller.repository!,
+        account: controller.userId,
+        current: () => controller.signedIn,
+        foreground: () => true,
+        store: MemoryReceiptStore(),
+      );
+      await tester.pumpWidget(HisaabApp(controller: controller));
+      await tester.tap(find.text('Groups'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Goa, here we come'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add expense'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'Test chai');
+      await tester.scrollUntilVisible(
+        find.text('Open calculator'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Open calculator'));
+      await tester.pumpAndSettle();
+      expect(controller.protectedDepth, 3);
+      await tester.enterText(
+        find.byKey(const Key('calculator-expression')),
+        '99 + 1',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Use ₹100.00'));
+      await tester.tap(find.text('Use ₹100.00'));
+      await tester.pumpAndSettle();
+      expect(controller.protectedDepth, 2);
+      await tester.scrollUntilVisible(
+        find.text('₹33.34'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('₹33.34'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Save expense'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save expense'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Test chai'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Test chai'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.receiptOverride?.dispose();
+      controller.dispose();
+    },
+  );
 }

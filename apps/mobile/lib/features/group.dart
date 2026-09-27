@@ -302,73 +302,86 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     final net = me == null ? 0 : g.netFor(me);
     final type = g.type == 'Direct' ? 'With a friend' : g.type;
     return Container(
-      padding: const EdgeInsets.all(22),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: HisaabColors.mint,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: HisaabColors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              GroupArtwork(type: g.type),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(g.name, style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$type · ${g.members.length} people',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: HisaabColors.teal,
-                      ),
-                    ),
-                    if (g.archived)
-                      const Text(
-                        'Archived',
-                        style: TextStyle(
+          EditorialArtwork(
+            asset: g.type == 'Home'
+                ? 'assets/illustrations/shared-home.png'
+                : 'assets/illustrations/moments.png',
+            height: 148,
+            borderRadius: BorderRadius.zero,
+            fit: BoxFit.cover,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(g.name, style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 6),
+                Text(
+                  '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: net < 0 ? HisaabColors.peach : HisaabColors.mint,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        net == 0
+                            ? 'All settled up'
+                            : net > 0
+                            ? 'You get back'
+                            : 'You owe',
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: HisaabColors.teal,
+                          fontWeight: FontWeight.w600,
+                          color: HisaabColors.ink,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        money(net.abs()),
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 38,
+                          color: HisaabColors.ink,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            net == 0
-                ? 'All settled up'
-                : net > 0
-                ? 'You get back'
-                : 'You owe',
-            style: const TextStyle(color: HisaabColors.teal),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            money(net.abs()),
-            style: const TextStyle(
-              fontFamily: 'Outfit',
-              fontWeight: FontWeight.w600,
-              fontSize: 38,
-              color: HisaabColors.ink,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            g.archived
-                ? 'History stays here. Reopen the group to add expenses.'
-                : 'Good times. Shared fairly. Everyone has the same record.',
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: HisaabColors.teal,
+                const SizedBox(height: 16),
+                Text(
+                  g.archived
+                      ? 'History stays here. Reopen the group to add expenses.'
+                      : 'Good times. Shared fairly. Everyone has the same record.',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -434,23 +447,46 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
         child: ExpansionTile(
           shape: const Border(),
           leading: CircleAvatar(
-            backgroundColor: HisaabColors.lilac,
-            foregroundColor: HisaabColors.teal,
+            backgroundColor: net < 0 ? HisaabColors.peach : HisaabColors.mint,
+            foregroundColor: HisaabColors.ink,
             child: Text(
               m.name.isEmpty ? '?' : m.name.characters.first.toUpperCase(),
             ),
           ),
-          title: Text(m.userId == c.userId ? 'You' : m.name),
-          subtitle: Text(
-            '${m.external
-                ? 'External · '
-                : m.placeholder
-                ? 'Not joined yet · '
-                : ''}${m.left ? 'Left · ' : ''}${net == 0
-                ? 'Settled'
-                : net > 0
-                ? 'is owed ${money(net)}'
-                : 'owes ${money(-net)}'}',
+          title: Text(
+            m.userId == c.userId ? 'You' : m.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(
+                net == 0
+                    ? 'Settled'
+                    : net > 0
+                    ? 'is owed ${money(net)}'
+                    : 'owes ${money(-net)}',
+                style: TextStyle(
+                  color: net < 0 ? HisaabColors.warning : HisaabColors.positive,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (m.external || m.placeholder || m.left)
+                Text(
+                  [
+                    if (m.external)
+                      'External'
+                    else if (m.placeholder)
+                      'Not joined yet',
+                    if (m.left) 'Left',
+                  ].join(' · '),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+            ],
           ),
           children: [
             ...group!
@@ -884,6 +920,49 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
   }
 }
 
+class _SettlementPerson extends StatelessWidget {
+  final String? name;
+  final String role;
+  final Color background;
+  const _SettlementPerson({
+    required this.name,
+    required this.role,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      ExcludeSemantics(
+        child: CircleAvatar(
+          radius: 34,
+          backgroundColor: background,
+          foregroundColor: HisaabColors.ink,
+          child: name == null || name!.isEmpty
+              ? const Icon(Icons.person_outline, size: 30)
+              : Text(
+                  name!.characters.first.toUpperCase(),
+                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 28),
+                ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        name ?? 'Choose a person',
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        role,
+        style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+      ),
+    ],
+  );
+}
+
 class SettlementPage extends StatefulWidget {
   final AppController controller;
   final Group group;
@@ -928,31 +1007,13 @@ class _SettlementPageState extends State<SettlementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final payer = from == null ? null : g.memberName(from!);
     final recipient = to == null ? null : g.memberName(to!);
     return Scaffold(
       appBar: AppBar(title: const Text('Settle up')),
       body: PageBody(
         children: [
           const SizedBox(height: 8),
-          Center(
-            child: ExcludeSemantics(
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: HisaabColors.lilac,
-                foregroundColor: HisaabColors.ink,
-                child: recipient == null || recipient.isEmpty
-                    ? const Icon(Icons.handshake_outlined, size: 32)
-                    : Text(
-                        recipient.characters.first.toUpperCase(),
-                        style: const TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 30,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
           Text(
             'Paid them back?',
             textAlign: TextAlign.center,
@@ -963,6 +1024,35 @@ class _SettlementPageState extends State<SettlementPage> {
             g.name,
             textAlign: TextAlign.center,
             style: const TextStyle(color: HisaabColors.muted),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _SettlementPerson(
+                  name: payer,
+                  role: 'Paid',
+                  background: HisaabColors.mint,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(12, 22, 12, 0),
+                child: ExcludeSemantics(
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _SettlementPerson(
+                  name: recipient,
+                  role: 'Received',
+                  background: HisaabColors.lilac,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           Container(
