@@ -7,6 +7,7 @@ using Hisaab.Api.Shared;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 
 namespace Hisaab.Api.Tests;
@@ -55,6 +56,54 @@ public sealed class AppleSecurityTests
         var encrypted = await tokens.ExchangeAsync("code", "com.hisaab.service", "expected-apple-account", "nonce", CancellationToken.None);
         Assert.NotEqual("valid-refresh-token", encrypted);
         Assert.Equal("valid-refresh-token", protector.Unprotect(encrypted));
+    }
+
+    [Theory]
+    [InlineData("app.hisaab.hisaab", false)]
+    [InlineData("com.hisaab.service", true)]
+    public async Task CodeExchangeAddsExactRedirectOnlyForServicesId(string audience, bool webFlow)
+    {
+        using var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var config = AppleConfiguration(signingKey);
+        const string redirect = "https://auth.hisaab.example/v1/auth/apple/callback";
+        config["Hisaab:Auth:apple:ClientIds"] = "app.hisaab.hisaab,com.hisaab.service";
+        config["Hisaab:Auth:apple:ServiceId"] = "com.hisaab.service";
+        config["Hisaab:Auth:apple:RedirectUri"] = redirect;
+        using var clients = new TestHttpClientFactory(request =>
+        {
+            var fields = QueryHelpers.ParseQuery(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            Assert.Equal(audience, fields["client_id"]);
+            Assert.Equal("authorization_code", fields["grant_type"]);
+            Assert.Equal("code", fields["code"]);
+            Assert.Equal(webFlow, fields.ContainsKey("redirect_uri"));
+            if (webFlow) Assert.Equal(redirect, fields["redirect_uri"]);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { id_token = "matching-id-token", refresh_token = "refresh" })
+            };
+        });
+        var tokens = new AppleTokens(config, clients, new TokenProtector(config), new AppleBindingVerifier("subject", audience));
+        await tokens.ExchangeAsync("code", audience, "subject", "nonce", CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("http://auth.hisaab.example/v1/auth/apple/callback")]
+    [InlineData("https://localhost/v1/auth/apple/callback")]
+    [InlineData("https://127.0.0.1/v1/auth/apple/callback")]
+    [InlineData("https://auth.hisaab.example/callback#fragment")]
+    [InlineData("https://user:password@auth.hisaab.example/callback")]
+    public async Task ServicesIdExchangeRejectsInvalidRedirectBeforeSendingCode(string? redirect)
+    {
+        using var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var config = AppleConfiguration(signingKey);
+        config["Hisaab:Auth:apple:ServiceId"] = "com.hisaab.service";
+        config["Hisaab:Auth:apple:RedirectUri"] = redirect;
+        using var clients = new TestHttpClientFactory(_ => throw new InvalidOperationException("An invalid redirect must not send the authorization code."));
+        var tokens = new AppleTokens(config, clients, new TokenProtector(config), new AppleBindingVerifier("subject", "com.hisaab.service"));
+        var error = await Assert.ThrowsAsync<DomainException>(() => tokens.ExchangeAsync("code", "com.hisaab.service", "subject", "nonce", CancellationToken.None));
+        Assert.Equal(503, error.Status);
+        Assert.Equal("apple_android_unconfigured", error.Code);
     }
 
     [Theory]

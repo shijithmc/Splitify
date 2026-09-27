@@ -19,7 +19,17 @@ public sealed class AppleTokens(IConfiguration config, IHttpClientFactory client
     public async Task<string> ExchangeAsync(string code, string audience, string expectedSubject, string nonce, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(code)) throw new DomainException(400, "apple_code_required", "Apple authorization code is required for account deletion support.");
-        using var response = await clients.CreateClient().PostAsync("https://appleid.apple.com/auth/token", new FormUrlEncodedContent(new Dictionary<string, string> { { "client_id", audience }, { "client_secret", ClientSecret(audience) }, { "code", code }, { "grant_type", "authorization_code" } }), ct);
+        var fields = new Dictionary<string, string> { { "client_id", audience }, { "client_secret", ClientSecret(audience) }, { "code", code }, { "grant_type", "authorization_code" } };
+        // Web/Android codes are bound to the registered redirect URI. Native Apple
+        // authorization does not use one, so add it only for the Services ID.
+        if (string.Equals(audience, config["Hisaab:Auth:apple:ServiceId"], StringComparison.Ordinal))
+        {
+            var redirect = config["Hisaab:Auth:apple:RedirectUri"];
+            if (!Uri.TryCreate(redirect, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || uri.HostNameType != UriHostNameType.Dns || uri.IsLoopback || uri.Fragment.Length != 0 || uri.UserInfo.Length != 0)
+                throw new DomainException(503, "apple_android_unconfigured", "Apple sign-in on Android is not configured.");
+            fields["redirect_uri"] = redirect!;
+        }
+        using var response = await clients.CreateClient().PostAsync("https://appleid.apple.com/auth/token", new FormUrlEncodedContent(fields), ct);
         if (!response.IsSuccessStatusCode) throw new DomainException(401, "apple_exchange_failed", "Apple sign-in could not be completed. Try again.");
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         if (!json.RootElement.TryGetProperty("id_token", out var returnedToken) || string.IsNullOrWhiteSpace(returnedToken.GetString())) throw new DomainException(401, "apple_exchange_identity_invalid", "Apple sign-in could not be bound to this account. Try again.");

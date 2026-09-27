@@ -20,6 +20,10 @@ class ApiRepository implements Repository {
   final http.Client client;
   final FlutterSecureStorage storage;
   Json? _session;
+  int _sessionGeneration = 0;
+  // Explicit session replacement/sign-out invalidates pending account actions;
+  // routine access-token rotation does not change the account lifecycle.
+  int get sessionGeneration => _sessionGeneration;
   final Map<String, Json> _cache = {};
   Future<void>? _refreshing;
   bool _offline = false;
@@ -41,6 +45,7 @@ class ApiRepository implements Repository {
   Future<void> restore() async {
     final saved = await storage.read(key: 'hisaab.session');
     if (saved == null) return;
+    ++_sessionGeneration;
     _session = object(jsonDecode(saved));
     final cache = await storage.read(key: 'hisaab.cache.$_account');
     if (cache != null) {
@@ -51,6 +56,7 @@ class ApiRepository implements Repository {
   }
 
   Future<void> saveSession(Json value) async {
+    ++_sessionGeneration;
     if (_account.isNotEmpty && _account != value['user']['id']) {
       await storage.delete(key: 'hisaab.cache.$_account');
     }
@@ -288,6 +294,7 @@ class ApiRepository implements Repository {
 
   @override
   Future<void> close() async {
+    ++_sessionGeneration;
     final account = _account;
     _closed = true;
     _session = null;

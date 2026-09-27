@@ -46,12 +46,14 @@ Sessions and authorized read snapshots use `flutter_secure_storage`, keyed per H
 
 ## Provider configuration
 
+Follow the [authentication runbook](../../docs/runbooks/authentication.md) for provider registration, the complete client/server mapping and live-device acceptance. Source integration and passing tests do not establish live sign-in readiness.
+
 | Setting | Purpose |
 |---|---|
 | `GOOGLE_CLIENT_ID` | iOS Google OAuth client ID; Android uses package/signing configuration. |
-| `GOOGLE_SERVER_CLIENT_ID` | Server OAuth audience for Google identity tokens. |
-| `APPLE_SERVICE_ID` | Apple service ID for the Android web sign-in flow. |
-| `APPLE_REDIRECT_URI` | HTTPS Apple callback on the service backend for Android. |
+| `GOOGLE_SERVER_CLIENT_ID` | Web OAuth client ID used as the server audience; allow it in backend `Hisaab:Auth:google:ClientIds`. |
+| `APPLE_SERVICE_ID` | Android web-flow Services ID; match backend `Hisaab:Auth:apple:ServiceId` and include it in `ClientIds` alongside the native bundle ID. |
+| `APPLE_REDIRECT_URI` | Registered HTTPS callback ending in `/v1/auth/apple/callback`; exactly match backend `Hisaab:Auth:apple:RedirectUri`. |
 | `REVENUECAT_IOS_KEY`, `REVENUECAT_ANDROID_KEY` | Platform public SDK keys; never backend secret keys. |
 | `PRIVACY_URL`, `TERMS_URL` | Public HTTPS legal documents; both required before enabling purchase buttons. |
 | `PUSH_ENABLED` | Enable only after Firebase/APNs native configuration and device testing. |
@@ -61,7 +63,7 @@ Sessions and authorized read snapshots use `flutter_secure_storage`, keyed per H
 
 Google/Apple identity tokens are sent to `/auth/sign-in`; only the server issues the Hisaab session. Apple uses a per-attempt SHA-256 nonce. Google Sign-In v7 supports nonce only during its mandatory once-per-process initialization, so this implementation uses Google issuer/audience/lifetime verification plus a fresh one-use server challenge, without asserting Google token nonce binding. Account linking first reauthenticates a currently linked method and checks the same Hisaab account, then verifies the newly linked provider. Existing conflicting accounts are not silently merged. Account deletion reauthenticates a linked provider and verifies the same Hisaab account immediately before submitting deletion.
 
-For iOS, configure `GOOGLE_REVERSED_CLIENT_ID` and `ADMOB_APP_ID` through ignored `ios/Flutter/Local.xcconfig` or CI build settings. The committed AdMob application ID is Google's **test application ID**, not a live account. Configure the registered bundle ID and Apple Sign In capability in Xcode; select your signing team. No developer team is committed. Add Google URL scheme and OAuth audiences that match the backend configuration. The Android Apple callback activity is included; configure your HTTPS service callback to validate state and return the SDK's `signinwithapple` intent URL for the registered package. The identity token must still pass backend verification.
+For iOS, configure `GOOGLE_REVERSED_CLIENT_ID` and `ADMOB_APP_ID` through ignored `ios/Flutter/Local.xcconfig` or CI build settings. The committed AdMob application ID is Google's **test application ID**, not a live account. Configure the registered bundle ID and Apple Sign In capability in Xcode; select your signing team. No developer team is committed. Add Google URL scheme and OAuth audiences that match the backend configuration. The Android Apple callback activity and backend `/v1/auth/apple/callback` handler are included; register that HTTPS URL with Apple and set the backend's `AndroidPackage` to the installed package. The handler validates state and returns the SDK's `signinwithapple` intent URL. Backend token verification and code exchange still apply; code exchange sends `redirect_uri` for the configured Services ID only, leaving native iOS exchange without it.
 
 Android's AdMob app ID can be supplied as Gradle property `ADMOB_APP_ID`; the default is Google's test app ID. Configure signing fingerprints/OAuth clients for your registered package `app.hisaab.hisaab`. Release artifacts are intentionally **not signed with a debug key**; supply proper store signing before distribution. Android backups are disabled to avoid restoring account tokens onto another installation.
 

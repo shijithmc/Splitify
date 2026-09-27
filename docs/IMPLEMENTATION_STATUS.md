@@ -72,3 +72,9 @@ Applied the approved illustrated visual system to existing mobile flows. Added b
 This is presentation and navigation work on the supported implementation. The expanded-v1 gallery is not a shipped-feature inventory; the proposed accounting, recurrence, UPI handoff, lifetime billing and other additions remain in the revised plan. No backend or infrastructure was changed.
 
 New widget coverage checks narrow displays, large text, payer/split controls, live store prices and quota, camera/crop controls, sign-in Back handling, and Home receipt/payment navigation. Local verification: Flutter analyzer clean; 53 default-suite tests passed, plus 4 ads-enabled lifecycle tests; final iOS simulator debug build passed. Welcome, Home and group-specific receipt navigation were inspected in the iPhone 16 Pro simulator. The PR CI also checks the Android debug build and unchanged backend suite. Real camera capture, identity providers, store transactions and cloud deployment retain their existing environment-specific release gates.
+
+## Authentication readiness — 27 September 2026
+
+Apple Android code exchange now includes the registered callback URL for the configured Services ID; native iOS code exchange omits it. Google and Apple ID-token audiences require exact matches. New offline tests exercise the production verifier using signed JWTs and discovery/JWKS responses, alongside the Apple exchange and session tests. These checks do not use live provider accounts.
+
+Flutter sign-in handles cancellation without displaying provider diagnostics, prevents overlapping requests, initializes the Google SDK once, and protects reauthentication/linking against account changes. Provider registration, signing, API deployment and real-account acceptance remain pending; use the [authentication runbook](runbooks/authentication.md) for the matching client/server configuration and acceptance checklist.
