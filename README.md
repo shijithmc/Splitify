@@ -44,6 +44,8 @@ Use the returned access token as `Authorization: Bearer …`. Ledger mutations r
 
 This is a runnable source implementation, not a deployed or store-approved release. Read the [implementation status and release gates](docs/IMPLEMENTATION_STATUS.md) for tested behavior, remaining scope and external prerequisites. No AWS resources, live ads or store products were created.
 
+The [revised v1 plan](V1_REVISION_IMPLEMENTATION_PLAN.md) proposes the expanded free feature set, expense-level settlements, UPI handoff and lifetime ad removal. It includes a [five-name screening report](docs/research/name-screening-2026-09-27.md). These are planning deliverables; the expanded features, prices and replacement name have not been adopted or implemented.
+
 ## Verify
 
 ```sh
