@@ -25,6 +25,7 @@ abstract final class HisaabTheme {
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'WorkSans',
+      fontFamilyFallback: const ['WorkSans'],
       scaffoldBackgroundColor: HisaabColors.surface,
       colorScheme: ColorScheme.fromSeed(
         seedColor: HisaabColors.primary,
@@ -54,50 +55,52 @@ abstract final class HisaabTheme {
       borderRadius: BorderRadius.circular(15),
     );
     return base.copyWith(
-      textTheme: base.textTheme.copyWith(
-        displayLarge: heading(48),
-        displayMedium: heading(42),
-        displaySmall: heading(36),
-        headlineLarge: heading(32),
-        headlineMedium: heading(28),
-        headlineSmall: heading(24),
-        titleLarge: heading(21),
-        titleMedium: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: HisaabColors.ink,
-          height: 1.4,
-        ),
-        bodyLarge: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          height: 1.5,
-          color: HisaabColors.ink,
-        ),
-        bodyMedium: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          height: 1.5,
-          color: HisaabColors.ink,
-        ),
-        bodySmall: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 14,
-          height: 1.5,
-          color: HisaabColors.muted,
-        ),
-        labelLarge: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-        labelMedium: const TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      textTheme: base.textTheme
+          .copyWith(
+            displayLarge: heading(48),
+            displayMedium: heading(42),
+            displaySmall: heading(36),
+            headlineLarge: heading(32),
+            headlineMedium: heading(28),
+            headlineSmall: heading(24),
+            titleLarge: heading(21),
+            titleMedium: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: HisaabColors.ink,
+              height: 1.4,
+            ),
+            bodyLarge: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              height: 1.5,
+              color: HisaabColors.ink,
+            ),
+            bodyMedium: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              height: 1.5,
+              color: HisaabColors.ink,
+            ),
+            bodySmall: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 14,
+              height: 1.5,
+              color: HisaabColors.muted,
+            ),
+            labelLarge: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            labelMedium: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          )
+          .apply(fontFamilyFallback: const ['WorkSans']),
       appBarTheme: AppBarTheme(
         backgroundColor: HisaabColors.surface,
         foregroundColor: HisaabColors.teal,
@@ -215,7 +218,11 @@ abstract final class HisaabTheme {
         selectedColor: HisaabColors.mint,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         side: const BorderSide(color: HisaabColors.line),
-        labelStyle: const TextStyle(fontFamily: 'WorkSans', fontSize: 14),
+        labelStyle: const TextStyle(
+          fontFamily: 'WorkSans',
+          fontSize: 14,
+          color: HisaabColors.ink,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       ),
       snackBarTheme: SnackBarThemeData(
