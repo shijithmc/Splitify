@@ -444,25 +444,32 @@ class _PremiumPageState extends State<PremiumPage> {
               color: HisaabColors.lilac,
               borderRadius: BorderRadius.circular(28),
             ),
-            child: const Column(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ExcludeSemantics(child: _PremiumIllustration()),
-                SizedBox(height: 18),
-                Text(
-                  'Less noise.\nMore good company.',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 32,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -.8,
-                    height: 1.15,
+                SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Good company.\nZero interruptions.',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 25,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -.6,
+                          height: 1.15,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'Your space, without banner ads.',
+                        style: TextStyle(fontSize: 14, height: 1.5),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'Enjoy Hisaab without ads, wherever you sign in.',
-                  style: TextStyle(height: 1.5),
                 ),
               ],
             ),
@@ -482,6 +489,7 @@ class _PremiumPageState extends State<PremiumPage> {
           ],
           const SizedBox(height: 20),
           Card(
+            color: HisaabColors.mint,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
               side: const BorderSide(color: HisaabColors.primary, width: 1.5),
@@ -601,6 +609,11 @@ class _PremiumPageState extends State<PremiumPage> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton(
+            onPressed: busy ? null : () => Navigator.of(context).maybePop(),
+            child: Text(c.adFree ? 'Back to account' : 'Keep using free'),
           ),
           const SizedBox(height: 18),
           const _AccountNotice(
@@ -880,55 +893,20 @@ class _PlanBenefit extends StatelessWidget {
 class _PremiumIllustration extends StatelessWidget {
   const _PremiumIllustration();
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 148,
-    height: 100,
-    child: Stack(
-      children: [
-        Positioned(
-          left: 10,
-          top: 10,
-          child: Transform.rotate(
-            angle: -.15,
-            child: Container(
-              width: 75,
-              height: 82,
-              decoration: BoxDecoration(
-                color: HisaabColors.primary,
-                borderRadius: BorderRadius.circular(23),
-              ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                color: Colors.white,
-                size: 38,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          right: 3,
-          bottom: 5,
-          child: Container(
-            width: 61,
-            height: 61,
-            decoration: BoxDecoration(
-              color: HisaabColors.mint,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: HisaabColors.lilac, width: 4),
-            ),
-            child: const Icon(
-              Icons.check_rounded,
-              color: HisaabColors.teal,
-              size: 32,
-            ),
-          ),
-        ),
-        const Positioned(
-          top: 0,
-          right: 18,
-          child: Icon(Icons.add_rounded, color: HisaabColors.teal, size: 20),
-        ),
-      ],
+  Widget build(BuildContext context) => Transform.rotate(
+    angle: -.12,
+    child: Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6EDC1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Icon(
+        Icons.star_outline_rounded,
+        color: Color(0xFF8A732B),
+        size: 32,
+      ),
     ),
   );
 }

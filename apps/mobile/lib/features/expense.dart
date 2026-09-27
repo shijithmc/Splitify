@@ -7,6 +7,7 @@ import '../core/money.dart';
 import '../main.dart';
 import 'shared.dart';
 import 'receipts.dart';
+import 'expense_calculator.dart';
 
 class ExpensePage extends StatefulWidget {
   final AppController controller;
@@ -116,7 +117,7 @@ class _ExpensePageState extends State<ExpensePage> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Little expenses. Shared fairly.',
+            'Every share, fair and square.',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 24),
@@ -165,7 +166,27 @@ class _ExpensePageState extends State<ExpensePage> {
               onChanged: (_) => setState(() {}),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final paise = await openPage<int>(
+                        context,
+                        widget.controller,
+                        ExpenseCalculatorPage(initialAmount: amount.text),
+                      );
+                      if (paise != null && mounted) {
+                        setState(() => amount.text = decimal(paise));
+                      }
+                    },
+              icon: const Icon(Icons.calculate_outlined, size: 20),
+              label: const Text('Open calculator'),
+            ),
+          ),
+          const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             isExpanded: true,
             initialValue: payer,
@@ -371,29 +392,46 @@ class _ExpensePageState extends State<ExpensePage> {
                 child: Text(error!, style: const TextStyle(color: clay)),
               ),
             ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed:
-                saving ||
-                    shares == null ||
-                    description.text.trim().isEmpty ||
-                    widget.controller.offline
-                ? null
-                : save,
-            icon: Icon(saving ? Icons.hourglass_top : Icons.check),
-            label: Text(saving ? 'Saving…' : 'Save expense'),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Everyone in this split can see the expense and its history.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: HisaabColors.muted,
-              height: 1.5,
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Align(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              decoration: const BoxDecoration(
+                color: HisaabColors.surface,
+                border: Border(top: BorderSide(color: HisaabColors.line)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed:
+                        saving ||
+                            shares == null ||
+                            description.text.trim().isEmpty ||
+                            widget.controller.offline
+                        ? null
+                        : save,
+                    icon: Icon(saving ? Icons.hourglass_top : Icons.check),
+                    label: Text(saving ? 'Saving…' : 'Save expense'),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Visible to everyone in this split.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: HisaabColors.muted),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

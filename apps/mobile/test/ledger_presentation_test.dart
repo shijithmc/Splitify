@@ -40,7 +40,16 @@ void main() {
       ),
     );
     await tester.enterText(find.byType(TextField).first, 'A shared lunch');
-    await tester.enterText(find.byType(TextField).at(1), '100');
+    final amount = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField && widget.decoration?.labelText == 'Total amount',
+    );
+    await tester.scrollUntilVisible(
+      amount,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(amount, '100');
     tester.testTextInput.hide();
     for (final mode in ['Exact', 'Percentage', 'Shares', 'Equal']) {
       final chip = find.widgetWithText(ChoiceChip, mode);

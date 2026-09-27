@@ -282,7 +282,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                 children: [
                   Text(
                     capturing && images.isEmpty
-                        ? 'Snap it. Check it. Split it.'
+                        ? 'One bill.\nEveryone’s share.'
                         : processing
                         ? 'Your bill is on its way.'
                         : 'One bill. Everyone’s share.',
@@ -292,23 +292,14 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                   Text(
                     c.demo
                         ? 'LOCAL DEMO · No image is sent to Google.'
-                        : 'Review every amount before it changes a balance.',
+                        : 'We read the bill. You stay in control of every amount and every split.',
                     style: const TextStyle(color: HisaabColors.muted),
                   ),
                   if (capturing && images.isEmpty) ...[
                     const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: ColoredBox(
-                        color: HisaabColors.lilac,
-                        child: Image.asset(
-                          'assets/illustrations/scan.png',
-                          height: 190,
-                          width: double.infinity,
-                          fit: BoxFit.contain,
-                          excludeFromSemantics: true,
-                        ),
-                      ),
+                    const EditorialArtwork(
+                      asset: 'assets/illustrations/receipt-story.png',
+                      height: 190,
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -338,7 +329,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                                   ),
                                 ),
                                 const Text(
-                                  'Monthly reset in IST',
+                                  'Monthly reset in IST · Manual entry is always available',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: HisaabColors.teal,
@@ -671,55 +662,125 @@ class _ReceiptSteps extends StatelessWidget {
   const _ReceiptSteps({required this.current});
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      for (var index = 0; index < 3; index++)
-        Expanded(
-          child: Semantics(
-            selected: index == current,
-            label: 'Step ${index + 1} of 3',
-            child: Column(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: index <= current
-                        ? HisaabColors.primary
-                        : HisaabColors.line,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '${index + 1}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: HisaabColors.line),
+      borderRadius: BorderRadius.circular(22),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var index = 0; index < 3; index++)
+          Expanded(
+            child: Semantics(
+              selected: index == current,
+              label: 'Step ${index + 1} of 3',
+              child: Column(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
                       color: index <= current
-                          ? Colors.white
+                          ? HisaabColors.primary
+                          : HisaabColors.surface,
+                      shape: BoxShape.circle,
+                      border: index <= current
+                          ? null
+                          : Border.all(color: HisaabColors.line),
+                    ),
+                    child: index < current
+                        ? const Icon(Icons.check, size: 18, color: Colors.white)
+                        : Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: index == current
+                                  ? Colors.white
+                                  : HisaabColors.muted,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    ['Capture', 'Review', 'Split'][index],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: index == current
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: index == current
+                          ? HisaabColors.primary
                           : HisaabColors.muted,
                     ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  ['Capture', 'Review', 'Split'][index],
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: index == current
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: index == current
-                        ? HisaabColors.primary
-                        : HisaabColors.muted,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-    ],
+      ],
+    ),
   );
+}
+
+class _ReceiptAllocationSummary extends StatelessWidget {
+  final List<Json> items;
+  final bool splitByItems;
+  const _ReceiptAllocationSummary({
+    required this.items,
+    required this.splitByItems,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final unassigned = items
+        .where(
+          (item) =>
+              item['ignored'] != true &&
+              (item['assigneeIds'] as List? ?? []).isEmpty,
+        )
+        .length;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: splitByItems && unassigned > 0
+            ? HisaabColors.peach
+            : HisaabColors.mint,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            splitByItems && unassigned > 0
+                ? Icons.people_outline
+                : Icons.receipt_long_outlined,
+            size: 22,
+            color: HisaabColors.ink,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${items.length} ${items.length == 1 ? 'item' : 'items'} on this bill'
+              '${!splitByItems || items.isEmpty
+                  ? ''
+                  : unassigned > 0
+                  ? ' · $unassigned to assign'
+                  : ' · No items left to assign'}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: HisaabColors.ink,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class ReceiptReviewPage extends StatefulWidget {
@@ -1033,6 +1094,8 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
             'Check it. Then split it.',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
+          const SizedBox(height: 8),
+          Text(g.name, style: const TextStyle(color: HisaabColors.muted)),
           const SizedBox(height: 18),
           _ReceiptSteps(current: preview == null ? 1 : 2),
           const SizedBox(height: 18),
@@ -1074,7 +1137,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
             ),
           if (rows(draft['images']).isNotEmpty ||
               rows(object(draft['server'])['media']).isNotEmpty)
-            TextButton.icon(
+            OutlinedButton.icon(
               onPressed: () => setState(() => showImage = !showImage),
               icon: const Icon(Icons.receipt_long_outlined),
               label: Text(showImage ? 'Hide bill image' : 'Check bill image'),
@@ -1213,13 +1276,12 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
           ),
           const SizedBox(height: 12),
           _amountField('Grand total (INR)', 'grandTotalPaise', locked: locked),
-          SectionTitle(
-            'Items',
-            trailing: Text(
-              '${items.length} on this bill',
-              style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
-            ),
+          const SectionTitle('Items'),
+          _ReceiptAllocationSummary(
+            items: items,
+            splitByItems: review['splitByItems'] == true,
           ),
+          const SizedBox(height: 12),
           if (items.isEmpty)
             const Text(
               'No item breakdown yet. Add items or split the grand total.',

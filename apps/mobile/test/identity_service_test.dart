@@ -429,8 +429,8 @@ void main() {
     (tester) async {
       final controller = SignInUiController()..loading = false;
       await tester.pumpWidget(HisaabApp(controller: controller));
-      await tester.scrollUntilVisible(find.text('Let’s get started'), 300);
-      await tester.tap(find.text('Let’s get started'));
+      await tester.scrollUntilVisible(find.text('Find your people'), 300);
+      await tester.tap(find.text('Find your people'));
       await tester.pumpAndSettle();
       controller.setLoading(true);
       await tester.pump();
@@ -446,7 +446,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Continue with Google'), findsOneWidget);
       expect(find.text('Continue with Apple'), findsOneWidget);
-      expect(find.text('Let’s get started'), findsNothing);
+      expect(find.text('Find your people'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
     },

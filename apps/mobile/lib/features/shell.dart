@@ -219,19 +219,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 onPressed: c.offline ? null : () => _addExpense(),
                 icon: const Icon(Icons.add),
                 label: const Text('Add expense'),
-                backgroundColor: green,
-                foregroundColor: Colors.white,
+                backgroundColor: HisaabColors.lime,
+                foregroundColor: HisaabColors.primary,
               )
             : null,
         bottomNavigationBar: NavigationBar(
           selectedIndex: c.tab,
           onDestinationSelected: c.selectTab,
-          backgroundColor: Colors.white,
-          indicatorColor: const Color(0xFFE8EEFD),
+          backgroundColor: const Color(0xFFFFFEF9),
+          indicatorColor: HisaabColors.mint,
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.space_dashboard_outlined),
-              selectedIcon: Icon(Icons.space_dashboard_rounded),
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
               label: 'Home',
             ),
             NavigationDestination(
@@ -304,6 +304,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget _home() {
     final net = c.balances['netPaise'] as int? ?? 0;
     final name = c.user['displayName'] as String? ?? 'friend';
+    final activeGroups = c.groups.where((g) => !g.archived).toList();
     return PageBody(
       children: [
         const SizedBox(height: 8),
@@ -314,10 +315,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'YOUR EVERYDAY, SHARED',
+                    'LET’S MAKE ROOM FOR GOOD TIMES',
                     style: TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 1,
+                      fontSize: 10,
+                      letterSpacing: .7,
                       color: HisaabColors.muted,
                     ),
                   ),
@@ -343,82 +344,72 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         Container(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(21),
           decoration: BoxDecoration(
-            color: HisaabColors.teal,
-            borderRadius: BorderRadius.circular(24),
+            color: HisaabColors.primary,
+            borderRadius: BorderRadius.circular(25),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'YOUR OVERALL BALANCE',
-                style: TextStyle(
-                  color: Color(0xFFD1E3DE),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: .7,
-                ),
-              ),
-              const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            money(net.abs()),
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Colors.white,
-                              fontSize: 43,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: -1.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          net == 0
-                              ? 'You’re all square overall'
-                              : net > 0
-                              ? 'You’re owed overall'
-                              : 'You owe overall',
-                          style: const TextStyle(
-                            color: Color(0xFFD1E3DE),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                  const Expanded(
+                    child: Text(
+                      'YOUR OVERALL BALANCE',
+                      style: TextStyle(
+                        color: Color(0xFFE2EBCA),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  ExcludeSemantics(
-                    child: Transform.rotate(
-                      angle: -.12,
-                      child: Container(
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: HisaabColors.mint,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.receipt_long_rounded,
-                          size: 33,
-                          color: HisaabColors.positive,
-                        ),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF345B44),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Text(
+                      'INR',
+                      style: TextStyle(color: Color(0xFFEAF2CD), fontSize: 11),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              const Divider(color: Color(0xFF5B7B7D)),
+              const SizedBox(height: 13),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  money(net.abs()),
+                  style: const TextStyle(
+                    fontFamily: 'Outfit',
+                    color: HisaabColors.balanceAmount,
+                    fontSize: 49,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -1.9,
+                    height: 1.05,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 9),
+              Text(
+                net == 0
+                    ? 'You’re all square overall'
+                    : net > 0
+                    ? 'You’re owed overall'
+                    : 'You owe overall',
+                style: const TextStyle(color: Color(0xFFE4ECCF), fontSize: 14),
+              ),
+              const SizedBox(height: 21),
+              const Divider(color: Color(0xFF4C6C50)),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -449,7 +440,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             _quickAction(
               'Add expense',
               Icons.add_rounded,
-              const Color(0xFFE2E9FD),
+              const Color(0xFFDDEAAB),
               () => _addExpense(),
             ),
             _quickAction(
@@ -461,30 +452,34 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             _quickAction(
               'Settle up',
               Icons.arrow_outward_rounded,
-              HisaabColors.mint,
+              HisaabColors.lilac,
               () => _groupAction(scan: false),
             ),
           ],
         ),
         SectionTitle(
-          'Your circles',
+          'Your people, your plans',
           trailing: TextButton(
             onPressed: () => c.selectTab(1),
             child: const Text('See all →'),
           ),
         ),
-        if (c.groups.where((g) => !g.archived).isEmpty)
+        if (activeGroups.isEmpty)
           EmptyCard(
             icon: Icons.people_outline,
-            title: 'Start with your people',
-            body: 'Create a group or add a friend to split your first expense.',
+            illustrationAsset: 'assets/illustrations/shared-home.png',
+            title: 'Bring your people',
+            body:
+                'Create your first group and keep everyone’s share in one place.',
             action: FilledButton(
               onPressed: c.offline ? null : () => createGroup(context, c),
               child: const Text('Create a group'),
             ),
           )
-        else
-          ...c.groups.where((g) => !g.archived).take(3).map(_groupTile),
+        else ...[
+          _momentsBanner(),
+          ...activeGroups.take(3).map(_groupTile),
+        ],
         const SectionTitle('Between friends'),
         if (rows(c.balances['friends']).isEmpty)
           const Text('All clear. Your shared balances will appear here.')
@@ -515,34 +510,52 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               }).toList(),
             ),
           ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: HisaabColors.mint,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.spa_outlined, size: 28, color: HisaabColors.positive),
-              SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'More memories.\nLess money talk.',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 19,
-                    height: 1.3,
-                    color: HisaabColors.teal,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
+
+  Widget _momentsBanner() => Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(right: 14),
+    decoration: BoxDecoration(
+      color: HisaabColors.illustrationBackground,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Row(
+      children: [
+        const Expanded(
+          child: EditorialArtwork(
+            asset: 'assets/illustrations/moments.png',
+            height: 112,
+            borderRadius: BorderRadius.zero,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Text.rich(
+              const TextSpan(
+                text: 'Collect moments.\n',
+                children: [
+                  TextSpan(
+                    text: 'We’ll keep the totals.',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: HisaabColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _quickAction(
     String label,
@@ -561,9 +574,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(17),
             ),
-            child: Icon(icon, size: 24),
+            child: Icon(icon, size: 24, color: HisaabColors.primary),
           ),
           const SizedBox(height: 8),
           Text(
@@ -632,12 +645,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     children: [
       Row(
         children: [
-          Icon(icon, color: const Color(0xFFD1E3DE), size: 15),
+          Icon(icon, color: const Color(0xFFDEE8CD), size: 15),
           const SizedBox(width: 5),
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFFD1E3DE), fontSize: 14),
+              style: const TextStyle(color: Color(0xFFDEE8CD), fontSize: 14),
             ),
           ),
         ],
@@ -648,7 +661,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           money(amount),
           style: const TextStyle(
             fontFamily: 'Outfit',
-            color: Colors.white,
+            color: Color(0xFFF8FFE5),
             fontWeight: FontWeight.w500,
             fontSize: 21,
           ),
@@ -657,54 +670,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ],
   );
 
-  Widget _groupTile(Group g) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Card(
-      clipBehavior: Clip.antiAlias,
+  Widget _groupTile(Group g) => DecoratedBox(
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: HisaabColors.line)),
+    ),
+    child: Material(
+      color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () =>
             openPage(context, c, GroupPage(controller: c, groupId: g.id)),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           child: Row(
             children: [
               GroupArtwork(type: g.type),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      g.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${g.type == 'Direct' ? 'Friend' : g.type} · ${g.count} people${g.archived ? ' · Archived' : ''}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: HisaabColors.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      g.net == 0
-                          ? 'Settled up'
-                          : '${g.net > 0 ? 'You get back' : 'You owe'} ${money(g.net.abs())}',
-                      style: TextStyle(
-                        color: g.net < 0
-                            ? HisaabColors.warning
-                            : HisaabColors.positive,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(width: 12),
+              Expanded(child: _groupCopy(g)),
               const SizedBox(width: 8),
               const Icon(
                 Icons.chevron_right,
@@ -717,17 +699,95 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
     ),
   );
+
+  Widget _groupCopy(Group g, {bool featured = false}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        g.name,
+        style: TextStyle(
+          fontFamily: featured ? 'Outfit' : 'WorkSans',
+          fontSize: featured ? 23 : 16,
+          fontWeight: FontWeight.w600,
+          height: 1.3,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        '${g.type == 'Direct' ? 'Friend' : g.type} · ${g.count} people${g.archived ? ' · Archived' : ''}',
+        style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        g.net == 0
+            ? 'Settled up'
+            : '${g.net > 0 ? 'You get back' : 'You owe'} ${money(g.net.abs())}',
+        style: TextStyle(
+          color: g.net < 0 ? HisaabColors.warning : HisaabColors.positive,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ],
+  );
+
+  Widget _featuredGroup(Group g) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Card(
+      color: HisaabColors.illustrationBackground,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () =>
+            openPage(context, c, GroupPage(controller: c, groupId: g.id)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            EditorialArtwork(
+              asset: g.type == 'Home'
+                  ? 'assets/illustrations/shared-home.png'
+                  : 'assets/illustrations/moments.png',
+              height: 196,
+              borderRadius: BorderRadius.zero,
+              fit: BoxFit.cover,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+              child: Row(
+                children: [
+                  Expanded(child: _groupCopy(g, featured: true)),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: HisaabColors.lime,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward,
+                      color: HisaabColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   Widget _groups() => PageBody(
     children: [
       SectionTitle(
-        'Groups & friends',
+        'Life, in good company',
         trailing: IconButton(
           tooltip: 'Create group or friend',
           onPressed: c.offline ? null : () => createGroup(context, c),
           icon: const Icon(Icons.add_circle_outline),
         ),
       ),
-      const Text('Shared plans. One place for every rupee.'),
+      const Text('Little circles. Big memories.'),
       const SizedBox(height: 20),
       if (c.invites.isNotEmpty) ...[
         const SectionTitle('Waiting for you'),
@@ -765,14 +825,24 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (c.groups.isEmpty)
         EmptyCard(
           icon: Icons.group_add_outlined,
+          illustrationAsset: 'assets/illustrations/shared-home.png',
           title: 'Start your first circle',
           body: 'Home, holidays, your person, or just a friend.',
           action: FilledButton(
-            onPressed: () => createGroup(context, c),
+            onPressed: c.offline ? null : () => createGroup(context, c),
             child: const Text('Create a group'),
           ),
         ),
-      ...c.groups.map(_groupTile),
+      if (c.groups.isNotEmpty) ...[
+        _featuredGroup(c.groups.first),
+        ...c.groups.skip(1).map(_groupTile),
+        const SizedBox(height: 20),
+        OutlinedButton.icon(
+          onPressed: c.offline ? null : () => createGroup(context, c),
+          icon: const Icon(Icons.add),
+          label: const Text('Create a new group'),
+        ),
+      ],
       const SizedBox(height: 85),
     ],
   );
@@ -917,7 +987,7 @@ class _WelcomeState extends State<Welcome> {
                   Container(
                     padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE6EDFA),
+                      color: HisaabColors.mint,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -937,12 +1007,12 @@ class _WelcomeState extends State<Welcome> {
                             fontSize: 29,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -1,
-                            color: HisaabColors.teal,
+                            color: HisaabColors.primary,
                           ),
                           children: [
                             TextSpan(
                               text: '.',
-                              style: TextStyle(color: HisaabColors.primary),
+                              style: TextStyle(color: HisaabColors.positive),
                             ),
                           ],
                         ),
@@ -953,38 +1023,38 @@ class _WelcomeState extends State<Welcome> {
               ),
               const SizedBox(height: 24),
               if (!showProviders) ...[
-                ClipRRect(
+                EditorialArtwork(
+                  asset: 'assets/illustrations/moments.png',
+                  height: 245,
                   borderRadius: BorderRadius.circular(26),
-                  child: Container(
-                    height: 230,
-                    width: double.infinity,
-                    color: const Color(0xFFEEF1FD),
-                    child: Image.asset(
-                      'assets/illustrations/together.png',
-                      fit: BoxFit.contain,
-                      cacheWidth: 900,
-                      semanticLabel: 'Three friends sharing a café bill',
-                    ),
-                  ),
+                  fit: BoxFit.cover,
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'GOOD COMPANY. CLEAR SHARES.',
+                  'SPLIT THE BILL. KEEP THE GOOD VIBES.',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 1,
                     color: HisaabColors.muted,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'More memories.\nLess money talk.',
+                Text.rich(
+                  const TextSpan(
+                    text: 'More memories.\n',
+                    children: [
+                      TextSpan(
+                        text: 'Less money talk.',
+                        style: TextStyle(color: Color(0xFF658447)),
+                      ),
+                    ],
+                  ),
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Dinners, getaways and everyday things. Split them fairly, enjoy them fully.',
+                  'From your first coffee to your next big trip. Keep every share simple, fair, and together.',
                   style: TextStyle(
                     color: HisaabColors.muted,
                     fontSize: 16,
@@ -996,20 +1066,25 @@ class _WelcomeState extends State<Welcome> {
                   spacing: 18,
                   runSpacing: 8,
                   children: [
+                    _WelcomeBenefit('Unlimited expenses'),
                     _WelcomeBenefit('Free core'),
-                    _WelcomeBenefit('No daily limits'),
                   ],
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: () => setState(() => signingIn = true),
-                  child: const Text('Let’s get started'),
+                  child: const Text('Find your people'),
                 ),
                 TextButton(
                   onPressed: () => setState(() => signingIn = true),
-                  child: const Text('Already here? Sign in'),
+                  child: const Text('Already have an account? Sign in'),
                 ),
               ] else ...[
+                const EditorialArtwork(
+                  asset: 'assets/illustrations/moments.png',
+                  height: 135,
+                ),
+                const SizedBox(height: 24),
                 Text(
                   'Your people.\nAll in one place.',
                   style: Theme.of(context).textTheme.displaySmall,
