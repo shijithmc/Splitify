@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/controller.dart';
 import '../core/design.dart';
+import '../core/native_services.dart';
 
 Future<T?> openPage<T>(
   BuildContext context,
@@ -28,6 +29,8 @@ void message(BuildContext context, Object text) {
 Future<void> act(BuildContext context, Future<void> Function() callback) async {
   try {
     await callback();
+  } on IdentityCancelled {
+    // Canceling a provider prompt is also valid during linking or deletion.
   } catch (e) {
     if (context.mounted) message(context, e);
   }

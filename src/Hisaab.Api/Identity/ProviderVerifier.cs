@@ -7,12 +7,12 @@ using Hisaab.Api.Shared;
 using Hisaab.Domain;
 namespace Hisaab.Api.Identity;
 
-public sealed class ProviderVerifier(IConfiguration config) : IProviderVerifier
+public sealed class ProviderVerifier(IConfiguration config, IHttpClientFactory clients) : IProviderVerifier
 {
     private readonly Dictionary<string, ConfigurationManager<OpenIdConnectConfiguration>> managers = new()
     {
-        ["google"] = new("https://accounts.google.com/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever()),
-        ["apple"] = new("https://appleid.apple.com/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever())
+        ["google"] = new("https://accounts.google.com/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever(), new HttpDocumentRetriever(clients.CreateClient())),
+        ["apple"] = new("https://appleid.apple.com/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever(), new HttpDocumentRetriever(clients.CreateClient()))
     };
     public async Task<VerifiedIdentity> VerifyAsync(SignInRequest request, CancellationToken ct = default)
     {
@@ -32,6 +32,7 @@ public sealed class ProviderVerifier(IConfiguration config) : IProviderVerifier
                 ValidIssuers = request.Provider == "google" ? ["https://accounts.google.com", "accounts.google.com"] : ["https://appleid.apple.com"],
                 ValidateAudience = true,
                 ValidAudiences = audiences,
+                IgnoreTrailingSlashWhenValidatingAudience = false,
                 ValidateLifetime = true,
                 RequireExpirationTime = true,
                 RequireSignedTokens = true,

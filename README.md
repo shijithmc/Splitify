@@ -63,6 +63,7 @@ Backend tests cover ledger conservation, concurrent/replayed mutations, authoriz
 ## Configuration and operations
 
 - [Mobile setup](apps/mobile/README.md): native identifiers, sign-in, Firebase, store products, legal URLs, ads and invite associations.
+- [Authentication setup](docs/runbooks/authentication.md): Google/Apple registrations, matching client/server configuration, signing and live-device acceptance.
 - [Infrastructure setup](infra/Hisaab.Cdk/README.md): publish assets, synthesize templates and configure an existing Secrets Manager secret.
 - [Configuration keys](.env.example): empty example only; never commit populated secrets.
 - [Support runbook](docs/runbooks/support.md): account/transaction lookup and audited, expiring grants.

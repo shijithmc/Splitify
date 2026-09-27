@@ -13,29 +13,100 @@ import 'config.dart';
 import 'models.dart';
 import 'repository.dart';
 
+class IdentityCancelled implements Exception {}
+
+typedef AppleCredentialRequest =
+    Future<AuthorizationCredentialAppleID> Function({
+      required List<AppleIDAuthorizationScopes> scopes,
+      String? nonce,
+      String? state,
+      WebAuthenticationOptions? webAuthenticationOptions,
+    });
+
 class IdentityService {
-  bool _googleReady = false;
+  // GoogleSignIn is a process-wide singleton and must initialize exactly once,
+  // including when an AppController is recreated or requests overlap.
+  static final _googleInitializations = Expando<Future<void>>();
+  final GoogleSignIn _google;
+  final AppleCredentialRequest _appleCredential;
+  final String googleClientId, googleServerId, appleClientId, appleRedirect;
+  final bool _android;
+  bool _busy = false;
+
+  IdentityService({
+    GoogleSignIn? google,
+    AppleCredentialRequest? appleCredential,
+    this.googleClientId = AppConfig.googleClientId,
+    this.googleServerId = AppConfig.googleServerId,
+    this.appleClientId = AppConfig.appleClientId,
+    this.appleRedirect = AppConfig.appleRedirect,
+    bool? android,
+  }) : _google = google ?? GoogleSignIn.instance,
+       _appleCredential =
+           appleCredential ?? SignInWithApple.getAppleIDCredential,
+       _android = android ?? Platform.isAndroid;
+
   Future<Json> credential(ApiRepository repo, String provider) async {
+    if (_busy) {
+      throw ApiFailure('Finish the current sign-in before trying again.');
+    }
+    if (provider != 'google' && provider != 'apple') {
+      throw ApiFailure('Choose Google or Apple to sign in.');
+    }
+    if (provider == 'google' && googleServerId.isEmpty) {
+      throw ApiFailure('Google sign-in is not configured for this build.');
+    }
+    if (provider == 'apple' &&
+        _android &&
+        (appleClientId.isEmpty ||
+            Uri.tryParse(appleRedirect)?.scheme != 'https' ||
+            Uri.tryParse(appleRedirect)?.host.isEmpty != false)) {
+      throw ApiFailure(
+        'Apple sign-in on Android needs its web callback configuration.',
+      );
+    }
+    _busy = true;
+    try {
+      return await _credential(repo, provider);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw IdentityCancelled();
+      }
+      if (e.code == GoogleSignInExceptionCode.clientConfigurationError ||
+          e.code == GoogleSignInExceptionCode.providerConfigurationError) {
+        throw ApiFailure(
+          'Google sign-in is not configured correctly for this build.',
+        );
+      }
+      throw ApiFailure('Google sign-in could not finish. Please try again.');
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) throw IdentityCancelled();
+      throw ApiFailure('Apple sign-in could not finish. Please try again.');
+    } on SignInWithAppleException {
+      throw ApiFailure(
+        'Apple sign-in is unavailable on this device. Please try Google.',
+      );
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<Json> _credential(ApiRepository repo, String provider) async {
     final challenge = await repo.request('GET', '/auth/challenge');
     final nonce = challenge['nonce'] as String;
     if (provider == 'google') {
-      if (AppConfig.googleServerId.isEmpty) {
-        throw ApiFailure('Google sign-in is not configured for this build.');
-      }
-      if (!_googleReady) {
-        // v7 allows initialization exactly once; its nonce cannot rotate safely.
-        // Server validates Google issuer, audience, lifetime and one-use challenge.
-        await GoogleSignIn.instance.initialize(
-          clientId: AppConfig.googleClientId.isEmpty
-              ? null
-              : AppConfig.googleClientId,
-          serverClientId: AppConfig.googleServerId,
-        );
-        _googleReady = true;
-      }
-      final account = await GoogleSignIn.instance.authenticate();
+      // v7's initialization nonce cannot rotate per request. The server validates
+      // Google's issuer, audience, lifetime and the one-use Hisaab challenge.
+      await (_googleInitializations[_google] ??= _google.initialize(
+        clientId: googleClientId.isEmpty ? null : googleClientId,
+        serverClientId: googleServerId,
+      ));
+      // The SDK requires sign-out before requesting another account. This only
+      // clears its local selection; it does not end the Hisaab session.
+      await _google.signOut();
+      final account = await _google.authenticate();
       final token = account.authentication.idToken;
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw ApiFailure('Google did not return an identity token.');
       }
       return {
@@ -46,30 +117,24 @@ class IdentityService {
           'displayName': account.displayName!.trim(),
       };
     }
-    if (Platform.isAndroid &&
-        (AppConfig.appleClientId.isEmpty || AppConfig.appleRedirect.isEmpty)) {
-      throw ApiFailure(
-        'Apple sign-in on Android needs its web callback configuration.',
-      );
-    }
-    final credential = await SignInWithApple.getAppleIDCredential(
+    final credential = await _appleCredential(
       scopes: [
         AppleIDAuthorizationScopes.email,
         AppleIDAuthorizationScopes.fullName,
       ],
       nonce: sha256.convert(utf8.encode(nonce)).toString(),
       state: nonce,
-      webAuthenticationOptions: Platform.isAndroid
+      webAuthenticationOptions: _android
           ? WebAuthenticationOptions(
-              clientId: AppConfig.appleClientId,
-              redirectUri: Uri.parse(AppConfig.appleRedirect),
+              clientId: appleClientId,
+              redirectUri: Uri.parse(appleRedirect),
             )
           : null,
     );
     if (credential.state != nonce) {
       throw ApiFailure('Apple sign-in state did not match. Please try again.');
     }
-    if (credential.identityToken == null) {
+    if (credential.identityToken == null || credential.identityToken!.isEmpty) {
       throw ApiFailure('Apple did not return an identity token.');
     }
     return {
@@ -93,18 +158,33 @@ class IdentityService {
     String provider,
     String accountId,
   ) async {
+    final generation = repo.sessionGeneration;
+    void requireCurrentAccount() {
+      if (repo.session?['user']?['id'] != accountId ||
+          repo.sessionGeneration != generation) {
+        throw ApiFailure('Account changed. Sign in again before continuing.');
+      }
+    }
+
+    requireCurrentAccount();
     final proof = await credential(repo, provider);
+    requireCurrentAccount();
     final session = await repo.request('POST', '/auth/sign-in', proof);
     if (session['user']['id'] != accountId) {
       throw ApiFailure(
         'That sign-in belongs to a different Hisaab account. Choose your current account to continue.',
       );
     }
+    requireCurrentAccount();
     await repo.saveSession(session);
   }
 
   Future<void> signOut() async {
-    if (_googleReady) await GoogleSignIn.instance.signOut();
+    final initialized = _googleInitializations[_google];
+    if (initialized != null) {
+      await initialized;
+      await _google.signOut();
+    }
   }
 }
 

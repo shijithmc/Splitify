@@ -54,10 +54,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: c,
     builder: (context, _) {
+      if (!c.signedIn) {
+        return Stack(
+          children: [
+            Welcome(controller: c),
+            if (c.loading) ...[
+              const ModalBarrier(dismissible: false, color: Color(0x66FFFFFF)),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          ],
+        );
+      }
       if (c.loading) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
-      if (!c.signedIn) return Welcome(controller: c);
       if (c.pendingNotification != null &&
           !_openingNotification &&
           c.protectedDepth == 0) {

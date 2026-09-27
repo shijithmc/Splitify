@@ -275,6 +275,8 @@ class SettingsPage extends StatelessWidget {
       message(context, 'Account linking needs a signed-in account.');
       return;
     }
+    final account = c.userId;
+    final repo = c.repository;
     final provider = await _chooseProvider(
       context,
       title: 'Link another sign-in',
@@ -294,16 +296,20 @@ class SettingsPage extends StatelessWidget {
     );
     if (currentProvider == null || !context.mounted) return;
     await act(context, () async {
-      await c.identity.reauthenticate(
-        c.repository as ApiRepository,
-        currentProvider,
-        c.userId,
-      );
-      final proof = await c.identity.credential(
-        c.repository as ApiRepository,
-        provider,
-      );
-      await c.request('POST', '/auth/link', proof);
+      if (repo is! ApiRepository ||
+          c.userId != account ||
+          !identical(c.repository, repo)) {
+        throw ApiFailure('Account changed. Start linking again from Settings.');
+      }
+      await c.identity.reauthenticate(repo, currentProvider, account);
+      if (c.userId != account || !identical(c.repository, repo)) {
+        throw ApiFailure('Account changed. Start linking again from Settings.');
+      }
+      final proof = await c.identity.credential(repo, provider);
+      if (c.userId != account || !identical(c.repository, repo)) {
+        throw ApiFailure('Account changed. Start linking again from Settings.');
+      }
+      await repo.request('POST', '/auth/link', proof);
       await c.refresh();
       if (context.mounted) {
         message(context, 'Sign-in method linked to this account.');

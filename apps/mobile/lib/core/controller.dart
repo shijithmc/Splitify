@@ -160,6 +160,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> login(String provider) async {
+    if (loading) return;
     ++_accountEpoch;
     loading = true;
     error = null;
@@ -181,6 +182,8 @@ class AppController extends ChangeNotifier {
       entitlement = object(session['entitlement']);
       await refresh();
       await _nativeIdentity();
+    } on IdentityCancelled {
+      // Closing the native account chooser returns to sign-in without an error.
     } catch (e) {
       error = '$e';
     }
