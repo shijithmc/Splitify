@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../core/controller.dart';
+import '../core/design.dart';
 import '../core/models.dart';
 import '../core/money.dart';
 import '../main.dart';
@@ -198,7 +199,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                     const Text(
                       'DEMO · local data only',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -260,16 +261,21 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  SegmentedButton<int>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: 0, label: Text('Expenses')),
-                      ButtonSegment(value: 1, label: Text('Balances')),
-                      ButtonSegment(value: 2, label: Text('Payments')),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final (index, label) in [
+                        'Expenses',
+                        'Balances',
+                        'Payments',
+                      ].indexed)
+                        ChoiceChip(
+                          label: Text(label),
+                          selected: section == index,
+                          onSelected: (_) => setState(() => section = index),
+                        ),
                     ],
-                    selected: {section},
-                    onSelectionChanged: (s) =>
-                        setState(() => section = s.first),
                   ),
                   const SizedBox(height: 20),
                   ...switch (section) {
@@ -294,43 +300,76 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     final g = group!;
     final me = g.participant(c.userId);
     final net = me == null ? 0 : g.netFor(me);
+    final type = g.type == 'Direct' ? 'With a friend' : g.type;
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFFE7EDDE),
-        borderRadius: BorderRadius.circular(24),
+        color: HisaabColors.mint,
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${g.type == 'Direct' ? 'With a friend' : g.type} · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
-            style: const TextStyle(fontSize: 12),
+          Row(
+            children: [
+              GroupArtwork(type: g.type),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(g.name, style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$type · ${g.members.length} people',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: HisaabColors.teal,
+                      ),
+                    ),
+                    if (g.archived)
+                      const Text(
+                        'Archived',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: HisaabColors.teal,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 24),
           Text(
             net == 0
                 ? 'All settled up'
                 : net > 0
                 ? 'You get back'
                 : 'You owe',
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(color: HisaabColors.teal),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             money(net.abs()),
             style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 34,
+              fontFamily: 'Outfit',
+              fontWeight: FontWeight.w600,
+              fontSize: 38,
+              color: HisaabColors.ink,
               letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           Text(
             g.archived
                 ? 'History stays here. Reopen the group to add expenses.'
-                : 'A shared record. Payments are recorded here, never transferred.',
-            style: const TextStyle(fontSize: 12, height: 1.5),
+                : 'Good times. Shared fairly. Everyone has the same record.',
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: HisaabColors.teal,
+            ),
           ),
         ],
       ),
@@ -356,13 +395,13 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               ? ReceiptThumbnail(controller: c, receiptId: e.receiptId!)
               : CircleAvatar(
                   backgroundColor: e.deleted
-                      ? const Color(0xFFE9E7E3)
-                      : const Color(0xFFEDF0E4),
+                      ? HisaabColors.surface
+                      : HisaabColors.peach,
                   child: Icon(
                     e.deleted
                         ? Icons.delete_outline
                         : Icons.receipt_long_outlined,
-                    color: green,
+                    color: HisaabColors.teal,
                   ),
                 ),
           title: Text(
@@ -374,7 +413,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
           ),
           subtitle: Text(
             '${group!.memberName(e.payer)} paid · ${e.date}${e.deleted ? '\nDeleted · tap to restore' : ''}',
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 14),
           ),
           trailing: Text(
             money(e.amount),
@@ -394,6 +433,13 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
         margin: const EdgeInsets.only(bottom: 10),
         child: ExpansionTile(
           shape: const Border(),
+          leading: CircleAvatar(
+            backgroundColor: HisaabColors.lilac,
+            foregroundColor: HisaabColors.teal,
+            child: Text(
+              m.name.isEmpty ? '?' : m.name.characters.first.toUpperCase(),
+            ),
+          ),
           title: Text(m.userId == c.userId ? 'You' : m.name),
           subtitle: Text(
             '${m.external
@@ -430,7 +476,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                   children: [
                     const Text(
                       'This person has not joined for 90 days. Keep their history and mark them as external if they will not use Hisaab.',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 14),
                     ),
                     TextButton(
                       onPressed: c.offline
@@ -549,7 +595,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               const SizedBox(height: 14),
               const Text(
                 'A name is enough to start. A verified email or a private invitation link lets them claim their shared history. Phone numbers alone never grant access.',
-                style: TextStyle(fontSize: 12, height: 1.5),
+                style: TextStyle(fontSize: 14, height: 1.5),
               ),
             ],
           ),
@@ -604,7 +650,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               const SizedBox(height: 12),
               Text(
                 'Expires ${invite['expiresAt'].toString().split('T').first}',
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 14),
               ),
             ],
           ),
@@ -881,81 +927,189 @@ class _SettlementPageState extends State<SettlementPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Settle up')),
-    body: PageBody(
-      children: [
-        const Icon(Icons.handshake_outlined, size: 56, color: green),
-        const SizedBox(height: 20),
-        const Text(
-          'Paid them back?',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -1,
+  Widget build(BuildContext context) {
+    final recipient = to == null ? null : g.memberName(to!);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settle up')),
+      body: PageBody(
+        children: [
+          const SizedBox(height: 8),
+          Center(
+            child: ExcludeSemantics(
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: HisaabColors.lilac,
+                foregroundColor: HisaabColors.ink,
+                child: recipient == null || recipient.isEmpty
+                    ? const Icon(Icons.handshake_outlined, size: 32)
+                    : Text(
+                        recipient.characters.first.toUpperCase(),
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 30,
+                        ),
+                      ),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Record a payment you have already made. Hisaab does not move money.',
-          style: TextStyle(height: 1.5),
-        ),
-        const SizedBox(height: 28),
-        DropdownButtonFormField<String>(
-          initialValue: from,
-          decoration: const InputDecoration(labelText: 'Who paid?'),
-          items: g.members
-              .map((m) => DropdownMenuItem(value: m.id, child: Text(m.name)))
-              .toList(),
-          onChanged: (v) => setState(() => from = v),
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          initialValue: to,
-          decoration: const InputDecoration(labelText: 'Who received?'),
-          items: g.members
-              .map((m) => DropdownMenuItem(value: m.id, child: Text(m.name)))
-              .toList(),
-          onChanged: (v) => setState(() => to = v),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: amount,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Amount',
-            prefixText: '₹ ',
-          ),
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          initialValue: method,
-          decoration: const InputDecoration(labelText: 'Paid with'),
-          items: [
-            'UPI',
-            'Cash',
-            'Other',
-          ].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-          onChanged: (v) => setState(() => method = v!),
-        ),
-        const SizedBox(height: 18),
-        if (from != null && to != null)
+          const SizedBox(height: 18),
           Text(
-            'Outstanding: ${money((-(g.pairs(from!)[to] ?? 0)).clamp(0, maxAmountPaise))}',
+            'Paid them back?',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(error!, style: const TextStyle(color: clay)),
+          const SizedBox(height: 8),
+          Text(
+            g.name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: HisaabColors.muted),
           ),
-        const SizedBox(height: 28),
-        FilledButton(
-          onPressed: saving || widget.controller.offline ? null : save,
-          child: Text(saving ? 'Recording…' : 'Record payment'),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: HisaabColors.mint,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: TextField(
+              controller: amount,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 36,
+                fontWeight: FontWeight.w600,
+                color: HisaabColors.ink,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Amount paid',
+                labelStyle: TextStyle(fontSize: 16, color: HisaabColors.teal),
+                prefixText: '₹ ',
+                suffixText: 'INR',
+                suffixStyle: TextStyle(fontSize: 14, color: HisaabColors.teal),
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: HisaabColors.primary, width: 2),
+                ),
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: from,
+            decoration: const InputDecoration(
+              labelText: 'Who paid?',
+              prefixIcon: Icon(Icons.north_east),
+            ),
+            items: g.members
+                .map(
+                  (m) => DropdownMenuItem(
+                    value: m.id,
+                    child: Text(m.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => from = v),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: to,
+            decoration: const InputDecoration(
+              labelText: 'Who received?',
+              prefixIcon: Icon(Icons.south_west),
+            ),
+            items: g.members
+                .map(
+                  (m) => DropdownMenuItem(
+                    value: m.id,
+                    child: Text(m.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => to = v),
+          ),
+          const SectionTitle('Paid with'),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: ['UPI', 'Cash', 'Other']
+                .map(
+                  (value) => ChoiceChip(
+                    avatar: Icon(switch (value) {
+                      'UPI' => Icons.account_balance_outlined,
+                      'Cash' => Icons.payments_outlined,
+                      _ => Icons.more_horiz,
+                    }, size: 20),
+                    label: Text(value),
+                    selected: method == value,
+                    onSelected: (_) => setState(() => method = value),
+                  ),
+                )
+                .toList(),
+          ),
+          if (from != null && to != null) ...[
+            const SizedBox(height: 20),
+            Text(
+              'Outstanding: ${money((-(g.pairs(from!)[to] ?? 0)).clamp(0, maxAmountPaise))}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: HisaabColors.peach,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 22, color: HisaabColors.ink),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Record a payment you have already made. Hisaab does not move money.',
+                    style: TextStyle(height: 1.5, color: HisaabColors.ink),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(error!, style: const TextStyle(color: clay)),
+              ),
+            ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: saving || widget.controller.offline ? null : save,
+            icon: Icon(saving ? Icons.hourglass_top : Icons.check),
+            label: Text(saving ? 'Recording…' : 'Record payment'),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'This adds a payment record to your shared history.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: HisaabColors.muted,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> save() async {
     setState(() => saving = true);
     try {

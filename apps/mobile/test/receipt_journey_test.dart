@@ -1,57 +1,13 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hisaab/core/controller.dart';
+import 'package:hisaab/core/design.dart';
 import 'package:hisaab/core/models.dart';
-import 'package:hisaab/core/receipt_drafts.dart';
 import 'package:hisaab/core/receipts.dart';
 import 'package:hisaab/features/receipts.dart';
 import 'package:hisaab/features/shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-class MemoryReceiptStore extends ReceiptDraftStore {
-  MemoryReceiptStore() : super('demo-you');
-  final records = <String, Json>{};
-  final images = <String, Uint8List>{};
-  @override
-  Future<void> save(Json draft) async =>
-      records[draft['id']] = object(jsonDecode(jsonEncode(draft)));
-  @override
-  Future<List<Json>> load() async => records.values.toList();
-  @override
-  Future<void> writeImage(String id, Uint8List bytes) async {
-    images[id] = bytes;
-  }
-
-  @override
-  Future<Uint8List> image(String id) async => images[id]!;
-  @override
-  Future<void> removeImage(String id) async {
-    images.remove(id);
-  }
-
-  @override
-  Future<void> remove(Json draft) async {
-    records.remove(draft['id']);
-    for (final media in rows(draft['images'])) {
-      images.remove(media['id']);
-    }
-  }
-
-  @override
-  Future<void> clear() async {
-    records.clear();
-    images.clear();
-  }
-}
-
-class ReceiptTestController extends AppController {
-  ReceiptCoordinator? receiptOverride;
-  @override
-  ReceiptCoordinator get receipts => receiptOverride ?? super.receipts;
-}
+import 'support/receipt_fakes.dart';
 
 void main() {
   setUp(() {
@@ -107,7 +63,7 @@ void main() {
       expect(controller.protectedDepth, 1);
       expect(find.text('Check it. Then split it.'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.textContaining('Check this reading'),
+        find.text('Lime soda × 2'),
         400,
         scrollable: find.byType(Scrollable).first,
       );
@@ -195,6 +151,77 @@ void main() {
       await tester.pump();
       expect(find.textContaining('Receipt hidden.'), findsOneWidget);
       expect(find.text('Corrected merchant'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      coordinator.dispose();
+    },
+  );
+  testWidgets(
+    'illustrated capture keeps the live allowance and safe actions at large text sizes',
+    (tester) async {
+      tester.view.physicalSize = const Size(375, 812);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final controller = ReceiptTestController();
+      await controller.startDemo();
+      final group = Group.from(
+        await controller.request(
+          'GET',
+          '/groups/${controller.groups.first.id}',
+        ),
+      );
+      final coordinator = ReceiptCoordinator(
+        repository: controller.repository!,
+        account: controller.userId,
+        current: () => controller.signedIn,
+        foreground: () => true,
+        store: MemoryReceiptStore(),
+      );
+      controller.receiptOverride = coordinator;
+      for (var i = 0; i < 2; i++) {
+        final counted = await coordinator.create(group.id);
+        counted['demoCounted'] = true;
+        counted['status'] = 'attached';
+      }
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: HisaabTheme.light,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.5)),
+            child: child!,
+          ),
+          home: ReceiptCapturePage(controller: controller, group: group),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('3 of 5 scans left this month'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Read bill'),
+        350,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Read bill'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(
+                TextButton,
+                'Enter manually with these photos',
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       coordinator.dispose();
     },

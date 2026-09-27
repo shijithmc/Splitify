@@ -2,6 +2,14 @@
 
 Flutter app for iOS and Android. Includes onboarding, native Google/Apple identity, groups and direct friends, placeholder invitations, all four split modes, expense revisions, 90-day external-member review, invitation revocation, balance views, recorded payments/disputes, activity, preferences, account deletion, RevenueCat purchase/restore, and consent-gated AdMob banners.
 
+## Illustrated interface
+
+The approved illustrated design is implemented across the app's supported flows: welcome/sign-in, Home and group lists, expense entry and split review, group activity, payment recording, receipt capture/review/assignment/viewing, settings and the annual plan. Home has shortcuts for expense entry, group-specific bill scanning and payment recording. All amounts, member details, scan allowances and store prices come from the current controller/repository.
+
+`lib/core/design.dart` defines the cobalt/teal palette, Material 3 controls and bundled Outfit/Work Sans fonts. `PageBody` constrains reading width on tablets, while forms and camera controls remain scrollable at larger text sizes. Asset provenance and font licences are in `assets/`.
+
+The mockup gallery also contains proposed expanded-v1 flows. This UI change does not implement their backend contracts: multiple payers, expense-level settlement/netting, live UPI handoff, recurrence, comments/search/export and lifetime purchases remain governed by `V1_REVISION_IMPLEMENTATION_PLAN.md`. The existing payment flow records an already-made payment; it does not move money. The annual plan uses the store's localized price and existing purchase safeguards.
+
 ## Run locally
 
 Use Flutter **3.44.6 / Dart 3.12.2**, Android SDK 36, Java 17; iOS 15+ with Xcode and CocoaPods. Android minimum SDK is 23. Commit `pubspec.lock` and `ios/Podfile.lock` for reproducible dependencies.
