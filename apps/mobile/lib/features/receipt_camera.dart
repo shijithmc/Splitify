@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/design.dart';
 import '../core/receipt_images.dart';
 import '../main.dart';
 
@@ -185,58 +186,95 @@ class _ReceiptCameraPageState extends State<ReceiptCameraPage>
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Photograph your bill')),
     body: SafeArea(
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Flatten the bill · Avoid glare · Keep every edge in frame',
-              textAlign: TextAlign.center,
-            ),
+      child: _ReceiptImageLayout(
+        guidance: Container(
+          margin: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: HisaabColors.lilac,
+            borderRadius: BorderRadius.circular(20),
           ),
-          Expanded(
-            child: error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(error!, textAlign: TextAlign.center),
-                    ),
-                  )
-                : camera?.value.isInitialized != true
-                ? const Center(child: CircularProgressIndicator())
-                : Center(
-                    child: CameraPreview(
-                      camera!,
-                      child: CustomPaint(painter: _ReceiptEdgePainter(bounds)),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.document_scanner_outlined,
+                color: HisaabColors.primary,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Flatten the bill · Avoid glare · Keep every edge in frame',
+                ),
+              ),
+            ],
+          ),
+        ),
+        preview: error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.no_photography_outlined,
+                          size: 48,
+                          color: HisaabColors.muted,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(error!, textAlign: TextAlign.center),
+                      ],
                     ),
                   ),
+                ),
+              )
+            : camera?.value.isInitialized != true
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: ColoredBox(
+                    color: HisaabColors.ink,
+                    child: Center(
+                      child: CameraPreview(
+                        camera!,
+                        child: CustomPaint(
+                          painter: _ReceiptEdgePainter(bounds),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+        controls: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                bounds == null
+                    ? 'Move the bill onto a contrasting surface.'
+                    : 'Edges found. Check the crop after taking the photo.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: taking || camera?.value.isInitialized != true
+                    ? null
+                    : capture,
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: Text(taking ? 'Preparing photo…' : 'Take photo'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'gallery'),
+                child: const Text('Choose from gallery instead'),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Text(
-                  bounds == null
-                      ? 'Move the bill onto a contrasting surface.'
-                      : 'Edges found. Check the crop after taking the photo.',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: taking || camera?.value.isInitialized != true
-                      ? null
-                      : capture,
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: Text(taking ? 'Preparing photo…' : 'Take photo'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, 'gallery'),
-                  child: const Text('Choose from gallery instead'),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
@@ -306,70 +344,120 @@ class _ReceiptCropPageState extends State<ReceiptCropPage> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Check the crop')),
     body: SafeArea(
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Check that every item and the total are readable. Keep the full photo if any text was cut off.',
-            ),
+      child: _ReceiptImageLayout(
+        guidance: Container(
+          margin: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: HisaabColors.mint,
+            borderRadius: BorderRadius.circular(20),
           ),
-          Expanded(
-            child: preparing
-                ? const Center(child: CircularProgressIndicator())
-                : InteractiveViewer(
-                    minScale: 1,
-                    maxScale: 5,
-                    child: Center(
-                      child: Image.memory(
-                        crop ? cropped! : widget.bytes,
-                        gaplessPlayback: true,
+          child: const Text(
+            'Check that every item and the total are readable. Keep the full photo if any text was cut off.',
+          ),
+        ),
+        preview: preparing
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: ColoredBox(
+                    color: HisaabColors.line,
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 5,
+                      child: Center(
+                        child: Image.memory(
+                          crop ? cropped! : widget.bytes,
+                          gaplessPlayback: true,
+                          semanticLabel: crop
+                              ? 'Cropped bill, pinch to zoom'
+                              : 'Full bill photo, pinch to zoom',
+                        ),
                       ),
                     ),
                   ),
-          ),
-          if (bounds != null)
-            SwitchListTile(
-              title: const Text('Use detected crop'),
-              subtitle: const Text('Turn off to keep the full photo'),
-              value: crop,
-              onChanged: (v) => setState(() => crop = v),
-            ),
-          if (bounds == null && !preparing)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Edges were unclear. The full photo is kept.',
-                style: TextStyle(color: clay),
+                ),
+              ),
+        controls: Column(
+          children: [
+            if (bounds != null)
+              SwitchListTile(
+                title: const Text('Use detected crop'),
+                subtitle: const Text('Turn off to keep the full photo'),
+                value: crop,
+                onChanged: (v) => setState(() => crop = v),
+              ),
+            if (bounds == null && !preparing)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'Edges were unclear. The full photo is kept.',
+                  style: TextStyle(color: clay),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Retake / choose again'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: preparing
+                          ? null
+                          : () => Navigator.pop(
+                              context,
+                              crop ? cropped : widget.bytes,
+                            ),
+                      child: const Text('Use photo'),
+                    ),
+                  ),
+                ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Retake / choose again'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: preparing
-                        ? null
-                        : () => Navigator.pop(
-                            context,
-                            crop ? cropped : widget.bytes,
-                          ),
-                    child: const Text('Use photo'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
+  );
+}
+
+/// Keep the image usable while allowing large text and controls to scroll.
+class _ReceiptImageLayout extends StatelessWidget {
+  final Widget guidance, preview, controls;
+  const _ReceiptImageLayout({
+    required this.guidance,
+    required this.preview,
+    required this.controls,
+  });
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final scrollable =
+          constraints.maxHeight < 600 ||
+          MediaQuery.textScalerOf(context).scale(16) > 20;
+      final content = Column(
+        children: [
+          guidance,
+          if (scrollable)
+            SizedBox(
+              height: (constraints.maxHeight * .5).clamp(180.0, 420.0),
+              child: preview,
+            )
+          else
+            Expanded(child: preview),
+          controls,
+        ],
+      );
+      return scrollable ? SingleChildScrollView(child: content) : content;
+    },
   );
 }

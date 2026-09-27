@@ -4,9 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../core/controller.dart';
+import '../core/design.dart';
 import '../core/models.dart';
 import '../core/money.dart';
-import '../main.dart';
 import 'receipts.dart';
 import 'shared.dart';
 
@@ -81,9 +81,15 @@ class _ReceiptThumbnailState extends State<ReceiptThumbnail>
     width: 44,
     height: 52,
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: bytes == null || widget.controller.userId != account
-          ? const Icon(Icons.receipt_long_outlined, color: green)
+          ? const ColoredBox(
+              color: HisaabColors.lilac,
+              child: Icon(
+                Icons.receipt_long_outlined,
+                color: HisaabColors.primary,
+              ),
+            )
           : Image.memory(
               bytes!,
               fit: BoxFit.cover,
@@ -333,15 +339,56 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
                 children: [
                   Text(
                     document['merchant'] ?? 'Bill image',
-                    style: const TextStyle(
-                      fontSize: 27,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Visible to current ${widget.group.type == 'Direct' ? 'participants' : 'group members'} · Review ${status!['revision'] ?? 0}',
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.lock_outline,
+                        size: 18,
+                        color: HisaabColors.muted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Visible to current ${widget.group.type == 'Direct' ? 'participants' : 'group members'} · Review ${status!['revision'] ?? 0}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: HisaabColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                  if (document['grandTotalPaise'] != null) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: HisaabColors.mint,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Reviewed bill total'),
+                          const SizedBox(height: 6),
+                          Text(
+                            money(document['grandTotalPaise']),
+                            style: Theme.of(context).textTheme.headlineLarge
+                                ?.copyWith(color: HisaabColors.teal),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.group.name,
+                            style: const TextStyle(color: HisaabColors.teal),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (status!['imagesRemoved'] == true)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
@@ -349,69 +396,124 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
                         'The images were removed. The accounting breakdown is retained.',
                       ),
                     ),
-                  ...rows(status!['media']).map(
-                    (media) => Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: SizedBox(
-                        height: 380,
-                        child: images[media['id']] == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : InteractiveViewer(
-                                minScale: 1,
-                                maxScale: 8,
-                                child: Image.memory(
-                                  images[media['id']]!,
-                                  fit: BoxFit.contain,
-                                  semanticLabel:
-                                      'Original shared receipt, pinch to zoom',
-                                ),
+                  if (status!['imagesRemoved'] != true)
+                    ...rows(status!['media']).map(
+                      (media) => Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: ColoredBox(
+                            color: HisaabColors.line,
+                            child: SizedBox(
+                              height: 380,
+                              child: images[media['id']] == null
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : InteractiveViewer(
+                                      minScale: 1,
+                                      maxScale: 8,
+                                      child: Image.memory(
+                                        images[media['id']]!,
+                                        fit: BoxFit.contain,
+                                        semanticLabel:
+                                            'Original shared receipt, pinch to zoom',
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (images.isNotEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Pinch the image to zoom in',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: HisaabColors.muted,
+                        ),
+                      ),
+                    ),
+                  if (items.isNotEmpty) ...[
+                    const SectionTitle('Reviewed items'),
+                    Card(
+                      child: Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < items.length;
+                            index++
+                          ) ...[
+                            if (index > 0)
+                              const Divider(
+                                height: 1,
+                                indent: 16,
+                                endIndent: 16,
                               ),
-                      ),
-                    ),
-                  ),
-                  if (items.isNotEmpty) const SectionTitle('Reviewed items'),
-                  ...items.map(
-                    (item) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('${item['name']} × ${item['quantity']}'),
-                      subtitle: Text(
-                        (item['assigneeIds'] as List? ?? [])
-                            .cast<String>()
-                            .map(widget.group.memberName)
-                            .join(', '),
-                      ),
-                      trailing: Text(money(item['lineTotalPaise'])),
-                    ),
-                  ),
-                  ...charges.map(
-                    (charge) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(charge['name']),
-                      subtitle: charge['includedInItemPrices'] == true
-                          ? const Text('Included in prices')
-                          : null,
-                      trailing: Text(money(charge['amountPaise'])),
-                    ),
-                  ),
-                  if (document['grandTotalPaise'] != null)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Grand total',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      trailing: Text(money(document['grandTotalPaise'])),
-                    ),
-                  if (object(revision['shares']).isNotEmpty) ...[
-                    const SectionTitle('Confirmed shares'),
-                    ...object(revision['shares']).entries.map(
-                      (entry) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(widget.group.memberName(entry.key)),
-                        trailing: Text(money(entry.value)),
+                            _ReceiptDetailRow(
+                              title:
+                                  '${items[index]['name']} × ${items[index]['quantity']}',
+                              subtitle:
+                                  (items[index]['assigneeIds'] as List? ?? [])
+                                      .cast<String>()
+                                      .map(widget.group.memberName)
+                                      .join(', '),
+                              amount: money(items[index]['lineTotalPaise']),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
+                  if (charges.isNotEmpty) ...[
+                    const SectionTitle('Tax, charges & discounts'),
+                    Card(
+                      child: Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < charges.length;
+                            index++
+                          ) ...[
+                            if (index > 0)
+                              const Divider(
+                                height: 1,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
+                            _ReceiptDetailRow(
+                              title: charges[index]['name'],
+                              subtitle:
+                                  charges[index]['includedInItemPrices'] == true
+                                  ? 'Included in prices'
+                                  : null,
+                              amount: money(charges[index]['amountPaise']),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (object(revision['shares']).isNotEmpty) ...[
+                    const SectionTitle('Confirmed shares'),
+                    Card(
+                      color: HisaabColors.lilac,
+                      child: Column(
+                        children: object(revision['shares']).entries
+                            .map(
+                              (entry) => _ReceiptDetailRow(
+                                title: widget.group.memberName(entry.key),
+                                amount: money(entry.value),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   if (participant)
                     TextButton.icon(
                       onPressed: busy ? null : flag,
@@ -437,5 +539,53 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
               ),
       );
     },
+  );
+}
+
+class _ReceiptDetailRow extends StatelessWidget {
+  final String title, amount;
+  final String? subtitle;
+  const _ReceiptDetailRow({
+    required this.title,
+    required this.amount,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Flexible(
+          flex: 2,
+          child: Text(
+            amount,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
   );
 }

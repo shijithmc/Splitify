@@ -64,3 +64,11 @@ See [receipt contract](api/receipts-contract.md), [operations](runbooks/receipts
 8. Complete physical-device accessibility, signed internal distribution and the store acceptance matrix from the original plan. Record measured evidence before declaring all MUST criteria or production launch complete.
 
 The debug demo is reviewable without those accounts. It is visibly isolated, cannot purchase or issue live invites, and must be disabled for store release.
+
+## Illustrated Flutter interface — 27 September 2026
+
+Applied the approved illustrated visual system to existing mobile flows. Added bundled café/receipt illustrations and Outfit/Work Sans fonts, shared Material 3 theme tokens, illustrated group tiles, clearer expense/payment hierarchy, live account scan allowance and store-priced annual plan cards. Home routes scanning and payment recording through a group chooser. Sign-in remains provider-backed with a separate local-demo entry.
+
+This is presentation and navigation work on the supported implementation. The expanded-v1 gallery is not a shipped-feature inventory; the proposed accounting, recurrence, UPI handoff, lifetime billing and other additions remain in the revised plan. No backend or infrastructure was changed.
+
+New widget coverage checks narrow displays, large text, payer/split controls, live store prices and quota, camera/crop controls, sign-in Back handling, and Home receipt/payment navigation. Local verification: Flutter analyzer clean; 53 default-suite tests passed, plus 4 ads-enabled lifecycle tests; final iOS simulator debug build passed. Welcome, Home and group-specific receipt navigation were inspected in the iPhone 16 Pro simulator. The PR CI also checks the Android debug build and unchanged backend suite. Real camera capture, identity providers, store transactions and cloud deployment retain their existing environment-specific release gates.

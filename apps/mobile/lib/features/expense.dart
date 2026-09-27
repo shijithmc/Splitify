@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../core/controller.dart';
+import '../core/design.dart';
 import '../core/models.dart';
 import '../core/money.dart';
 import '../main.dart';
@@ -97,31 +98,28 @@ class _ExpensePageState extends State<ExpensePage> {
       ),
       body: PageBody(
         children: [
-          const Text(
-            'Little expenses.\nShared fairly.',
-            style: TextStyle(
-              fontSize: 29,
-              height: 1.15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -1,
-            ),
+          Row(
+            children: [
+              const Icon(
+                Icons.people_outline,
+                size: 20,
+                color: HisaabColors.teal,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  g.name,
+                  style: const TextStyle(color: HisaabColors.muted),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 26),
-          if (widget.expense == null) ...[
-            OutlinedButton.icon(
-              onPressed: () async {
-                final saved = await openPage<bool>(
-                  context,
-                  widget.controller,
-                  ReceiptCapturePage(controller: widget.controller, group: g),
-                );
-                if (saved == true && context.mounted) Navigator.pop(context);
-              },
-              icon: const Icon(Icons.document_scanner_outlined),
-              label: const Text('Scan bill'),
-            ),
-            const SizedBox(height: 18),
-          ],
+          const SizedBox(height: 12),
+          Text(
+            'Little expenses. Shared fairly.',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 24),
           TextField(
             controller: description,
             maxLength: 100,
@@ -133,61 +131,84 @@ class _ExpensePageState extends State<ExpensePage> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: amount,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w600),
-            decoration: const InputDecoration(
-              labelText: 'Total amount',
-              prefixText: '₹ ',
-              suffixText: 'INR',
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: HisaabColors.mint,
+              borderRadius: BorderRadius.circular(24),
             ),
-            onChanged: (_) => setState(() {}),
+            child: TextField(
+              controller: amount,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 36,
+                fontWeight: FontWeight.w600,
+                color: HisaabColors.ink,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Total amount',
+                labelStyle: TextStyle(fontSize: 16, color: HisaabColors.teal),
+                prefixText: '₹ ',
+                suffixText: 'INR',
+                suffixStyle: TextStyle(fontSize: 14, color: HisaabColors.teal),
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: HisaabColors.primary, width: 2),
+                ),
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
           ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: payer,
-                  decoration: const InputDecoration(labelText: 'Paid by'),
-                  items: g.members
-                      .where((m) => !m.left || m.id == payer)
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m.id,
-                          child: Text(
-                            m.userId == widget.controller.userId
-                                ? 'You'
-                                : m.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => payer = v),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final chosen = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.parse(date),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
-                    );
-                    if (chosen != null) setState(() => date = day(chosen));
-                  },
-                  icon: const Icon(Icons.calendar_today_outlined, size: 17),
-                  label: Text(date, style: const TextStyle(fontSize: 12)),
-                ),
-              ),
-            ],
+          const SizedBox(height: 20),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: payer,
+            decoration: const InputDecoration(
+              labelText: 'Paid by',
+              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+            ),
+            items: g.members
+                .where((m) => !m.left || m.id == payer)
+                .map(
+                  (m) => DropdownMenuItem(
+                    value: m.id,
+                    child: Text(
+                      m.userId == widget.controller.userId ? 'You' : m.name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => payer = v),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final chosen = await showDatePicker(
+                context: context,
+                initialDate: DateTime.parse(date),
+                firstDate: DateTime(2000),
+                lastDate: DateTime.now(),
+              );
+              if (chosen != null && mounted) {
+                setState(() => date = day(chosen));
+              }
+            },
+            icon: const Icon(Icons.calendar_today_outlined, size: 20),
+            label: Text('Date · $date'),
           ),
           const SectionTitle('How are we splitting?'),
+          const Text(
+            'Choose a method, then include everyone sharing this expense.',
+            style: TextStyle(color: HisaabColors.muted, height: 1.5),
+          ),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -207,66 +228,71 @@ class _ExpensePageState extends State<ExpensePage> {
                 .toList(),
           ),
           const SizedBox(height: 18),
-          ...g.members.map(
-            (m) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: selected.contains(m.id),
-                        onChanged: m.left || m.deleted
-                            ? null
-                            : (v) => setState(() {
-                                if (v == true) {
-                                  selected.add(m.id);
-                                } else {
-                                  selected.remove(m.id);
-                                }
-                              }),
+          ...g.members.map((m) {
+            final included = selected.contains(m.id);
+            final name = m.userId == widget.controller.userId ? 'You' : m.name;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 10, 14, 10),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: included,
+                      semanticLabel: 'Include $name in split',
+                      onChanged: m.left || m.deleted
+                          ? null
+                          : (v) => setState(() {
+                              if (v == true) {
+                                selected.add(m.id);
+                              } else {
+                                selected.remove(m.id);
+                              }
+                            }),
+                    ),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
-                      Expanded(
-                        child: Text(
-                          m.userId == widget.controller.userId ? 'You' : m.name,
-                        ),
-                      ),
-                      if (mode != 'Equal' && selected.contains(m.id))
-                        SizedBox(
-                          width: 100,
-                          child: TextField(
-                            controller: allocations[m.id],
-                            keyboardType: TextInputType.numberWithOptions(
-                              decimal: mode != 'Shares',
-                            ),
-                            textAlign: TextAlign.end,
-                            decoration: InputDecoration(
-                              hintText: mode == 'Shares' ? '1' : '0.00',
-                              prefixText: mode == 'Exact' ? '₹ ' : null,
-                              suffixText: mode == 'Percentage' ? '%' : null,
-                              contentPadding: const EdgeInsets.all(12),
-                            ),
-                            onChanged: (_) => setState(() {}),
+                    ),
+                    if (mode != 'Equal' && included) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 110,
+                        child: TextField(
+                          controller: allocations[m.id],
+                          keyboardType: TextInputType.numberWithOptions(
+                            decimal: mode != 'Shares',
                           ),
+                          textAlign: TextAlign.end,
+                          decoration: InputDecoration(
+                            labelText: mode == 'Percentage'
+                                ? '$name %'
+                                : mode == 'Shares'
+                                ? '$name shares'
+                                : '$name amount',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            hintText: mode == 'Shares' ? '1' : '0.00',
+                            prefixText: mode == 'Exact' ? '₹ ' : null,
+                            suffixText: mode == 'Percentage' ? '%' : null,
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                          onChanged: (_) => setState(() {}),
                         ),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          }),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: shares == null
-                  ? const Color(0xFFF4E7D7)
-                  : const Color(0xFFE5EDDC),
-              borderRadius: BorderRadius.circular(20),
+              color: shares == null ? HisaabColors.peach : HisaabColors.mint,
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,12 +303,14 @@ class _ExpensePageState extends State<ExpensePage> {
                       shares == null
                           ? Icons.info_outline
                           : Icons.check_circle_outline,
-                      size: 20,
+                      size: 22,
                     ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Split preview',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Split preview',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ],
                 ),
@@ -292,10 +320,11 @@ class _ExpensePageState extends State<ExpensePage> {
                 else
                   ...shares!.entries.map(
                     (e) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      padding: const EdgeInsets.symmetric(vertical: 7),
                       child: Row(
                         children: [
                           Expanded(child: Text(g.memberName(e.key))),
+                          const SizedBox(width: 12),
                           Text(
                             money(e.value),
                             style: const TextStyle(fontWeight: FontWeight.w600),
@@ -308,23 +337,41 @@ class _ExpensePageState extends State<ExpensePage> {
                   const Divider(height: 28),
                   Text(
                     'Remainder order: ${ordered.where((pid) => mode != 'Percentage' || inputs()[pid]! > 0).map(g.memberName).join(' → ')}',
-                    style: const TextStyle(fontSize: 11, height: 1.6),
+                    style: const TextStyle(fontSize: 14, height: 1.6),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'Any extra paisa goes in this fixed order.',
-                    style: TextStyle(fontSize: 11),
+                    style: TextStyle(fontSize: 14),
                   ),
                 ],
               ],
             ),
           ),
+          if (widget.expense == null) ...[
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final saved = await openPage<bool>(
+                  context,
+                  widget.controller,
+                  ReceiptCapturePage(controller: widget.controller, group: g),
+                );
+                if (saved == true && context.mounted) Navigator.pop(context);
+              },
+              icon: const Icon(Icons.document_scanner_outlined),
+              label: const Text('Scan bill'),
+            ),
+          ],
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(top: 18),
-              child: Text(error!, style: const TextStyle(color: clay)),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(error!, style: const TextStyle(color: clay)),
+              ),
             ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 24),
           FilledButton.icon(
             onPressed:
                 saving ||
@@ -340,7 +387,11 @@ class _ExpensePageState extends State<ExpensePage> {
           const Text(
             'Everyone in this split can see the expense and its history.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Color(0xFF6C796D)),
+            style: TextStyle(
+              fontSize: 14,
+              color: HisaabColors.muted,
+              height: 1.5,
+            ),
           ),
         ],
       ),
