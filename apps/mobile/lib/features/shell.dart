@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../core/ads.dart';
 import '../core/config.dart';
 import '../core/controller.dart';
@@ -89,41 +90,39 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return Scaffold(
         appBar: AppBar(
           title: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.people_outline_rounded,
-                size: 28,
-                color: HisaabColors.primary,
-              ),
-              const SizedBox(width: 8),
-              const Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'hisaab.',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                      fontSize: 27,
-                    ),
-                  ),
+              Flexible(
+                child: Text(
+                  ['Hisaab', 'Groups & friends', 'Activity', 'Account'][c.tab],
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (c.demo) ...[
-                const SizedBox(width: 12),
-                const Chip(
-                  label: Text(
-                    'DEMO',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
                   ),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
+                  decoration: BoxDecoration(
+                    color: HisaabColors.mint,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'DEMO',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ],
           ),
           actions: [
+            if (c.tab == 1)
+              TextButton(
+                onPressed: c.offline ? null : () => createGroup(context, c),
+                child: const Text('New'),
+              ),
             IconButton(
               tooltip: 'Join an invitation',
               onPressed: () => joinInvite(context, c),
@@ -224,40 +223,76 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 onPressed: c.offline ? null : () => _addExpense(),
                 icon: const Icon(Icons.add),
                 label: const Text('Add expense'),
-                backgroundColor: HisaabColors.lime,
-                foregroundColor: HisaabColors.primary,
               )
             : null,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: c.tab,
-          onDestinationSelected: (tab) {
-            FocusScope.of(context).unfocus();
-            c.selectTab(tab);
-          },
-          backgroundColor: const Color(0xFFFFFEF9),
-          indicatorColor: HisaabColors.mint,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people),
-              label: 'Groups',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long),
-              label: 'Activity',
-            ),
-            NavigationDestination(icon: Icon(Icons.tune), label: 'Settings'),
-          ],
-        ),
+        bottomNavigationBar: _navigationBar(),
       );
     },
   );
+
+  void _selectTab(int tab) {
+    FocusScope.of(context).unfocus();
+    c.selectTab(tab);
+  }
+
+  Widget _navigationBar() {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return CupertinoTabBar(
+        currentIndex: c.tab,
+        onTap: _selectTab,
+        activeColor: HisaabColors.primary,
+        inactiveColor: HisaabColors.muted,
+        backgroundColor: Colors.white,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.house),
+            activeIcon: Icon(CupertinoIcons.house_fill),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.person_2),
+            activeIcon: Icon(CupertinoIcons.person_2_fill),
+            label: 'Groups',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.clock),
+            activeIcon: Icon(CupertinoIcons.clock_fill),
+            label: 'Activity',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.settings),
+            label: 'Settings',
+          ),
+        ],
+      );
+    }
+    return NavigationBar(
+      selectedIndex: c.tab,
+      onDestinationSelected: _selectTab,
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home_rounded),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.people_outline),
+          selectedIcon: Icon(Icons.people),
+          label: 'Groups',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.history_outlined),
+          selectedIcon: Icon(Icons.history),
+          label: 'Activity',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
+      ],
+    );
+  }
 
   Future<void> _openNotification() async {
     if (!mounted || _openingNotification || c.protectedDepth != 0) return;
@@ -311,153 +346,83 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Widget _home() {
     final net = c.balances['netPaise'] as int? ?? 0;
-    final name = c.user['displayName'] as String? ?? 'friend';
     final activeGroups = c.groups.where((g) => !g.archived).toList();
     return PageBody(
+      key: const PageStorageKey('home'),
       children: [
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'YOUR SHARED EXPENSES',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: .7,
-                      color: HisaabColors.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    'Hey, $name',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            IconButton.filledTonal(
-              tooltip: 'Open your profile',
-              onPressed: () => c.selectTab(3),
-              icon: Text(
-                name.characters.firstOrNull ?? '?',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Overall balance',
+                  style: TextStyle(fontSize: 13, color: HisaabColors.muted),
                 ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(21),
-          decoration: BoxDecoration(
-            color: HisaabColors.primary,
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'YOUR OVERALL BALANCE',
-                      style: TextStyle(
-                        color: Color(0xFFE2EBCA),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 1.2,
+                const SizedBox(height: 4),
+                Text(
+                  money(net.abs()),
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w600,
+                    color: net < 0
+                        ? HisaabColors.warning
+                        : HisaabColors.positive,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  net == 0
+                      ? ((c.balances['owedPaise'] as int? ?? 0) > 0 ||
+                                (c.balances['owingPaise'] as int? ?? 0) > 0
+                            ? 'Your balances cancel out overall'
+                            : 'No net balance overall')
+                      : net > 0
+                      ? 'You’re owed overall'
+                      : 'You owe overall',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _metric(
+                        'You are owed',
+                        c.balances['owedPaise'] ?? 0,
+                        HisaabColors.positive,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _metric(
+                        'You owe',
+                        c.balances['owingPaise'] ?? 0,
+                        HisaabColors.warning,
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF345B44),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: const Text(
-                      'INR',
-                      style: TextStyle(color: Color(0xFFEAF2CD), fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 13),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  money(net.abs()),
-                  style: const TextStyle(
-                    fontFamily: 'Outfit',
-                    color: HisaabColors.balanceAmount,
-                    fontSize: 49,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: -1.9,
-                    height: 1.05,
-                  ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 9),
-              Text(
-                net == 0
-                    ? ((c.balances['owedPaise'] as int? ?? 0) > 0 ||
-                              (c.balances['owingPaise'] as int? ?? 0) > 0
-                          ? 'Your balances cancel out overall'
-                          : 'No net balance overall')
-                    : net > 0
-                    ? 'You’re owed overall'
-                    : 'You owe overall',
-                style: const TextStyle(color: Color(0xFFE4ECCF), fontSize: 14),
-              ),
-              const SizedBox(height: 21),
-              const Divider(color: Color(0xFF4C6C50)),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _metric(
-                      'You are owed',
-                      c.balances['owedPaise'] ?? 0,
-                      Icons.south_west,
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _metric(
-                      'You owe',
-                      c.balances['owingPaise'] ?? 0,
-                      Icons.north_east,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 4),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _quickAction(
               'Attach receipt',
-              Icons.attach_file_rounded,
-              HisaabColors.peach,
+              Icons.attach_file,
               () => _groupAction(attachReceipt: true),
             ),
             _quickAction(
               'Settle up',
-              Icons.arrow_outward_rounded,
-              HisaabColors.lilac,
+              Icons.swap_horiz,
               () => _groupAction(attachReceipt: false),
             ),
           ],
@@ -466,7 +431,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           'Your groups',
           trailing: TextButton(
             onPressed: () => c.selectTab(1),
-            child: const Text('See all →'),
+            child: const Text('See all'),
           ),
         ),
         if (activeGroups.isEmpty)
@@ -481,9 +446,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               child: const Text('Create a group'),
             ),
           )
-        else ...[
-          ...activeGroups.take(3).map(_groupTile),
-        ],
+        else
+          Card(
+            child: Column(
+              children: activeGroups.take(3).map(_groupTile).toList(),
+            ),
+          ),
         const SectionTitle('Balances with friends'),
         if (rows(c.balances['friends']).isEmpty)
           const Text('All clear. Your shared balances will appear here.')
@@ -521,37 +489,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _quickAction(
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback action,
-  ) => Expanded(
-    child: TextButton(
-      onPressed: c.offline ? null : action,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(17),
-            ),
-            child: Icon(icon, size: 24, color: HisaabColors.primary),
-          ),
-          const SizedBox(height: 8),
-          Text(
+  Widget _quickAction(String label, IconData icon, VoidCallback action) =>
+      Expanded(
+        child: TextButton.icon(
+          onPressed: c.offline ? null : action,
+          icon: Icon(icon, size: 18),
+          label: Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+            style: const TextStyle(fontSize: 14),
           ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 
   Future<void> _groupAction({required bool attachReceipt}) async {
     final active = c.groups.where((g) => !g.archived).toList();
@@ -604,95 +553,74 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     });
   }
 
-  Widget _metric(String label, int amount, IconData icon) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Icon(icon, color: const Color(0xFFDEE8CD), size: 15),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: Color(0xFFDEE8CD), fontSize: 14),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 6),
-      FittedBox(
-        child: Text(
-          money(amount),
-          style: const TextStyle(
-            fontFamily: 'Outfit',
-            color: Color(0xFFF8FFE5),
-            fontWeight: FontWeight.w500,
-            fontSize: 21,
-          ),
-        ),
-      ),
-    ],
-  );
-
-  Widget _groupTile(Group g) => DecoratedBox(
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: HisaabColors.line)),
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () =>
-            openPage(context, c, GroupPage(controller: c, groupId: g.id)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Row(
-            children: [
-              GroupArtwork(type: g.type),
-              const SizedBox(width: 12),
-              Expanded(child: _groupCopy(g)),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: HisaabColors.muted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Widget _groupCopy(Group g) => Column(
+  Widget _metric(String label, int amount, Color color) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        g.name,
-        style: TextStyle(
-          fontFamily: 'WorkSans',
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          height: 1.3,
-        ),
+        label,
+        style: const TextStyle(fontSize: 12, color: HisaabColors.muted),
       ),
       const SizedBox(height: 4),
       Text(
-        '${g.type == 'Direct' ? 'Friend' : g.type} · ${g.count} people${g.archived ? ' · Archived' : ''}',
-        style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
-      ),
-      const SizedBox(height: 5),
-      Text(
-        g.net == 0
-            ? 'No net balance'
-            : '${g.net > 0 ? 'You get back' : 'You owe'} ${money(g.net.abs())}',
+        money(amount),
         style: TextStyle(
-          color: g.net < 0 ? HisaabColors.warning : HisaabColors.positive,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+          color: color,
         ),
       ),
     ],
+  );
+
+  Widget _groupTile(Group g, {BorderRadius? borderRadius}) => Material(
+    color: Colors.white,
+    borderRadius: borderRadius,
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: HisaabColors.mint,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(groupIcon(g.type), size: 22),
+          ),
+          title: Text(g.name),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${g.type == 'Direct' ? 'Friend' : g.type} · ${g.count} people${g.archived ? ' · Archived' : ''}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                g.net == 0
+                    ? 'No net balance'
+                    : '${g.net > 0 ? 'You get back' : 'You owe'} ${money(g.net.abs())}',
+                style: TextStyle(
+                  color: g.net < 0
+                      ? HisaabColors.warning
+                      : HisaabColors.positive,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            size: 18,
+            color: HisaabColors.muted,
+          ),
+          onTap: () =>
+              openPage(context, c, GroupPage(controller: c, groupId: g.id)),
+        ),
+        const Divider(indent: 72),
+      ],
+    ),
   );
 
   Widget _groups() {
@@ -707,17 +635,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return matchesFilter && g.name.toLowerCase().contains(query);
     }).toList();
     return PageBody(
+      key: const PageStorageKey('groups'),
       children: [
-        SectionTitle(
-          'Groups & friends',
-          trailing: TextButton.icon(
-            onPressed: c.offline ? null : () => createGroup(context, c),
-            icon: const Icon(Icons.add, size: 20),
-            label: const Text('New'),
-          ),
-        ),
-        const Text('Find a group, check your balance, or add an expense.'),
-        const SizedBox(height: 16),
         TextField(
           controller: _groupSearch,
           textInputAction: TextInputAction.search,
@@ -742,6 +661,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               .map(
                 (filter) => ChoiceChip(
                   label: Text(filter),
+                  showCheckmark: false,
                   selected: _groupFilter == filter,
                   onSelected: (_) => setState(() => _groupFilter = filter),
                 ),
@@ -815,25 +735,24 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   )
                 : null,
           ),
-        if (visible.isNotEmpty) ...[
-          ...visible.map(_groupTile),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: c.offline ? null : () => createGroup(context, c),
-            icon: const Icon(Icons.add),
-            label: const Text('Create a new group'),
+        for (final (index, group) in visible.indexed)
+          _groupTile(
+            group,
+            borderRadius: BorderRadius.vertical(
+              top: index == 0 ? const Radius.circular(12) : Radius.zero,
+              bottom: index == visible.length - 1
+                  ? const Radius.circular(12)
+                  : Radius.zero,
+            ),
           ),
-        ],
         const SizedBox(height: 85),
       ],
     );
   }
 
   Widget _activity() => PageBody(
+    key: const PageStorageKey('activity'),
     children: [
-      const SectionTitle('Recent activity'),
-      const Text('Expenses and payments from all your groups.'),
-      const SizedBox(height: 22),
       if (c.activity.isEmpty)
         const EmptyCard(
           icon: Icons.receipt_long_outlined,
@@ -987,7 +906,6 @@ class _WelcomeState extends State<Welcome> {
                         TextSpan(
                           text: 'hisaab',
                           style: TextStyle(
-                            fontFamily: 'Outfit',
                             fontSize: 29,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -1,

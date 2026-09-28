@@ -154,11 +154,30 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Text(group?.name ?? 'Your circle'),
         actions: [
+          if (group != null && !group!.archived)
+            IconButton(
+              tooltip: 'Attach receipt',
+              onPressed: c.offline ? null : attachReceipt,
+              icon: const Icon(Icons.attach_file_rounded),
+            ),
           if (group != null)
             PopupMenuButton<String>(
               tooltip: 'Group options',
               onSelected: options,
               itemBuilder: (_) => [
+                if (!group!.archived) ...[
+                  PopupMenuItem(
+                    value: 'member',
+                    enabled: !c.offline,
+                    child: const Text('Add person'),
+                  ),
+                  PopupMenuItem(
+                    value: 'invite',
+                    enabled: !c.offline,
+                    child: const Text('Invite'),
+                  ),
+                  const PopupMenuDivider(),
+                ],
                 const PopupMenuItem(
                   value: 'rename',
                   child: Text('Rename group'),
@@ -213,56 +232,9 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                     ),
                   if (error != null)
                     Text(error!, style: const TextStyle(color: clay)),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _summary(),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (!group!.archived)
-                        OutlinedButton.icon(
-                          onPressed: c.offline
-                              ? null
-                              : () async {
-                                  await openPage(
-                                    context,
-                                    c,
-                                    ReceiptCapturePage(
-                                      controller: c,
-                                      group: group!,
-                                    ),
-                                  );
-                                  await load();
-                                  await c.refresh();
-                                },
-                          icon: const Icon(Icons.attach_file_rounded, size: 18),
-                          label: const Text('Attach receipt'),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: group!.archived || c.offline
-                            ? null
-                            : addMember,
-                        icon: const Icon(Icons.person_add_alt_1, size: 18),
-                        label: const Text('Add person'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: group!.archived || c.offline ? null : invite,
-                        icon: const Icon(Icons.ios_share, size: 18),
-                        label: const Text('Invite'),
-                      ),
-                      if (!group!.archived)
-                        OutlinedButton.icon(
-                          onPressed: c.offline ? null : () => openSettlement(),
-                          icon: const Icon(
-                            Icons.check_circle_outline,
-                            size: 18,
-                          ),
-                          label: const Text('Settle up'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -279,7 +251,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                   ...switch (section) {
                     0 => _expenseList(),
                     1 => _balanceList(),
@@ -304,12 +276,8 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     final net = me == null ? 0 : g.netFor(me);
     final hasBalances = me != null && g.pairs(me).values.any((v) => v != 0);
     final type = g.type == 'Direct' ? 'With a friend' : g.type;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: net < 0 ? HisaabColors.peach : HisaabColors.mint,
-        borderRadius: BorderRadius.circular(24),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -317,30 +285,47 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
             '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
             style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
           ),
-          const SizedBox(height: 12),
-          Text(
-            net == 0
-                ? hasBalances
-                      ? 'No net balance'
-                      : 'You are settled up'
-                : net > 0
-                ? 'You get back'
-                : 'You owe',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              money(net.abs()),
-              style: const TextStyle(
-                fontFamily: 'Outfit',
-                fontWeight: FontWeight.w600,
-                fontSize: 38,
-                color: HisaabColors.ink,
-                letterSpacing: -1,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      net == 0
+                          ? hasBalances
+                                ? 'No net balance'
+                                : 'You are settled up'
+                          : net > 0
+                          ? 'You get back'
+                          : 'You owe',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    if (net != 0)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          money(net.abs()),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 26,
+                            color: net < 0
+                                ? HisaabColors.warning
+                                : HisaabColors.positive,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
+              if (!g.archived)
+                TextButton(
+                  onPressed: c.offline ? null : openSettlement,
+                  child: const Text('Settle up'),
+                ),
+            ],
           ),
           if (g.archived || (net == 0 && hasBalances)) ...[
             const SizedBox(height: 12),
@@ -381,57 +366,69 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                 label: const Text('Add the first expense'),
               ),
       ),
-    ...expenses.map(
-      (e) => Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 10,
-          ),
-          leading: e.receiptId != null && !e.deleted
-              ? ReceiptThumbnail(controller: c, receiptId: e.receiptId!)
-              : CircleAvatar(
-                  backgroundColor: e.deleted
-                      ? HisaabColors.surface
-                      : HisaabColors.peach,
-                  child: Icon(
-                    e.deleted
-                        ? Icons.delete_outline
-                        : Icons.receipt_long_outlined,
-                    color: HisaabColors.teal,
-                  ),
-                ),
-          title: Text(
-            e.description,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              decoration: e.deleted ? TextDecoration.lineThrough : null,
-            ),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                '${group!.memberName(e.payer)} paid ${money(e.amount)} · ${e.date}',
-                style: const TextStyle(fontSize: 14),
+    for (final (index, e) in expenses.indexed)
+      Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(
+          top: index == 0 ? const Radius.circular(12) : Radius.zero,
+          bottom: index == expenses.length - 1
+              ? const Radius.circular(12)
+              : Radius.zero,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            if (index != 0) const Divider(height: 1, indent: 64),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
               ),
-              const SizedBox(height: 4),
-              Text(
-                e.deleted ? 'Deleted · tap to restore' : _expenseShare(e),
+              leading: e.receiptId != null && !e.deleted
+                  ? ReceiptThumbnail(controller: c, receiptId: e.receiptId!)
+                  : CircleAvatar(
+                      radius: 18,
+                      backgroundColor: e.deleted
+                          ? HisaabColors.surface
+                          : HisaabColors.mint,
+                      child: Icon(
+                        e.deleted
+                            ? Icons.delete_outline
+                            : Icons.receipt_long_outlined,
+                        color: HisaabColors.teal,
+                      ),
+                    ),
+              title: Text(
+                e.description,
                 style: TextStyle(
-                  fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: e.deleted ? HisaabColors.muted : HisaabColors.ink,
+                  decoration: e.deleted ? TextDecoration.lineThrough : null,
                 ),
               ),
-            ],
-          ),
-          onTap: () => expenseDetails(e),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 2),
+                  Text(
+                    '${group!.memberName(e.payer)} paid ${money(e.amount)} · ${e.date}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    e.deleted ? 'Deleted · tap to restore' : _expenseShare(e),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: e.deleted ? HisaabColors.muted : HisaabColors.ink,
+                    ),
+                  ),
+                ],
+              ),
+              onTap: () => expenseDetails(e),
+            ),
+          ],
         ),
       ),
-    ),
     if (cursor != null)
       TextButton(onPressed: loadMore, child: const Text('Load older expenses')),
   ];
@@ -859,12 +856,30 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     await c.refresh();
   }
 
+  Future<void> attachReceipt() async {
+    await openPage(
+      context,
+      c,
+      ReceiptCapturePage(controller: c, group: group!),
+    );
+    await load();
+    await c.refresh();
+  }
+
   Future<void> options(String option) async {
     if (c.offline) {
       message(context, 'Refresh online before changing this group.');
       return;
     }
     final g = group!;
+    if (option == 'member' && !g.archived) {
+      await addMember();
+      return;
+    }
+    if (option == 'invite' && !g.archived) {
+      await invite();
+      return;
+    }
     if (option == 'rename') {
       final name = await askText(
         context,
@@ -917,49 +932,6 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       });
     }
   }
-}
-
-class _SettlementPerson extends StatelessWidget {
-  final String? name;
-  final String role;
-  final Color background;
-  const _SettlementPerson({
-    required this.name,
-    required this.role,
-    required this.background,
-  });
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      ExcludeSemantics(
-        child: CircleAvatar(
-          radius: 34,
-          backgroundColor: background,
-          foregroundColor: HisaabColors.ink,
-          child: name == null || name!.isEmpty
-              ? const Icon(Icons.person_outline, size: 30)
-              : Text(
-                  name!.characters.first.toUpperCase(),
-                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 28),
-                ),
-        ),
-      ),
-      const SizedBox(height: 10),
-      Text(
-        name ?? 'Choose a person',
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        role,
-        style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
-      ),
-    ],
-  );
 }
 
 class SettlementPage extends StatefulWidget {
@@ -1042,8 +1014,6 @@ class _SettlementPageState extends State<SettlementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final payer = from == null ? null : g.memberName(from!);
-    final recipient = to == null ? null : g.memberName(to!);
     if (payers.isEmpty) {
       final hasBalances = g.members.any(
         (m) => g.pairs(m.id).values.any((value) => value != 0),
@@ -1071,211 +1041,161 @@ class _SettlementPageState extends State<SettlementPage> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('Settle up')),
-      body: PageBody(
+      body: Column(
         children: [
-          const SizedBox(height: 8),
-          Text(
-            'Record a payment',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            g.name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: HisaabColors.muted),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _SettlementPerson(
-                  name: payer,
-                  role: 'Paid',
-                  background: HisaabColors.mint,
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 22, 12, 0),
-                child: ExcludeSemantics(
-                  child: Icon(
-                    Icons.arrow_forward_rounded,
-                    color: HisaabColors.muted,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: _SettlementPerson(
-                  name: recipient,
-                  role: 'Received',
-                  background: HisaabColors.lilac,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: HisaabColors.mint,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: TextField(
-              controller: amount,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              style: const TextStyle(
-                fontFamily: 'Outfit',
-                fontSize: 36,
-                fontWeight: FontWeight.w600,
-                color: HisaabColors.ink,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'Amount paid',
-                labelStyle: TextStyle(fontSize: 16, color: HisaabColors.teal),
-                prefixText: '₹ ',
-                suffixText: 'INR',
-                suffixStyle: TextStyle(fontSize: 14, color: HisaabColors.teal),
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: HisaabColors.primary, width: 2),
-                ),
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: from,
-            decoration: const InputDecoration(
-              labelText: 'Who paid?',
-              prefixIcon: Icon(Icons.north_east),
-            ),
-            items: payers
-                .map(
-                  (m) => DropdownMenuItem(
-                    value: m.id,
-                    child: Text(
-                      g.memberName(m.id),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: saving
-                ? null
-                : (v) {
-                    if (v != null) {
-                      setState(() => selectPayer(v, recipient: to));
-                    }
-                  },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            key: ValueKey('recipient-$from-$to'),
-            initialValue: to,
-            decoration: const InputDecoration(
-              labelText: 'Who received?',
-              prefixIcon: Icon(Icons.south_west),
-            ),
-            items: recipients(from)
-                .map(
-                  (m) => DropdownMenuItem(
-                    value: m.id,
-                    child: Text(
-                      g.memberName(m.id),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: saving
-                ? null
-                : (v) => setState(() {
-                    to = v;
-                    updateAmount();
-                  }),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Choose an outstanding balance you can record. Partial payments are welcome.',
-            style: TextStyle(fontSize: 14, color: HisaabColors.muted),
-          ),
-          const SectionTitle('Paid with'),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: ['UPI', 'Cash', 'Other']
-                .map(
-                  (value) => ChoiceChip(
-                    avatar: Icon(switch (value) {
-                      'UPI' => Icons.account_balance_outlined,
-                      'Cash' => Icons.payments_outlined,
-                      _ => Icons.more_horiz,
-                    }, size: 20),
-                    label: Text(value),
-                    selected: method == value,
-                    onSelected: (_) => setState(() => method = value),
-                  ),
-                )
-                .toList(),
-          ),
-          if (from != null && to != null) ...[
-            const SizedBox(height: 20),
-            Text(
-              'Outstanding: ${money((-(g.pairs(from!)[to] ?? 0)).clamp(0, maxAmountPaise))}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ],
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: HisaabColors.peach,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: PageBody(
               children: [
-                Icon(Icons.info_outline, size: 22, color: HisaabColors.ink),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Record a payment you have already made. Hisaab does not move money.',
-                    style: TextStyle(height: 1.5, color: HisaabColors.ink),
+                Text(g.name, style: const TextStyle(color: HisaabColors.muted)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 22,
+                        color: HisaabColors.ink,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Record a payment you have already made. Hisaab does not move money.',
+                          style: TextStyle(
+                            height: 1.5,
+                            color: HisaabColors.ink,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amount,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    color: HisaabColors.ink,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount paid',
+                    prefixText: '₹ ',
+                    suffixText: 'INR',
+                  ),
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: from,
+                  decoration: const InputDecoration(
+                    labelText: 'Who paid?',
+                    prefixIcon: Icon(Icons.north_east),
+                  ),
+                  items: payers
+                      .map(
+                        (m) => DropdownMenuItem(
+                          value: m.id,
+                          child: Text(
+                            g.memberName(m.id),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: saving
+                      ? null
+                      : (v) {
+                          if (v != null) {
+                            setState(() => selectPayer(v, recipient: to));
+                          }
+                        },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  key: ValueKey('recipient-$from-$to'),
+                  initialValue: to,
+                  decoration: const InputDecoration(
+                    labelText: 'Who received?',
+                    prefixIcon: Icon(Icons.south_west),
+                  ),
+                  items: recipients(from)
+                      .map(
+                        (m) => DropdownMenuItem(
+                          value: m.id,
+                          child: Text(
+                            g.memberName(m.id),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: saving
+                      ? null
+                      : (v) => setState(() {
+                          to = v;
+                          updateAmount();
+                        }),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Choose an outstanding balance you can record. Partial payments are welcome.',
+                  style: TextStyle(fontSize: 14, color: HisaabColors.muted),
+                ),
+                const SectionTitle('Paid with'),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: ['UPI', 'Cash', 'Other']
+                      .map(
+                        (value) => ChoiceChip(
+                          avatar: Icon(switch (value) {
+                            'UPI' => Icons.account_balance_outlined,
+                            'Cash' => Icons.payments_outlined,
+                            _ => Icons.more_horiz,
+                          }, size: 20),
+                          label: Text(value),
+                          selected: method == value,
+                          onSelected: (_) => setState(() => method = value),
+                        ),
+                      )
+                      .toList(),
+                ),
+                if (from != null && to != null) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    'Outstanding: ${money((-(g.pairs(from!)[to] ?? 0)).clamp(0, maxAmountPaise))}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
               ],
             ),
           ),
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(error!, style: const TextStyle(color: clay)),
-              ),
-            ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: saving || widget.controller.offline ? null : save,
-            icon: Icon(saving ? Icons.hourglass_top : Icons.check),
-            label: Text(saving ? 'Recording…' : 'Record payment'),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'This adds a payment record to your shared history.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: HisaabColors.muted,
-              height: 1.5,
+          SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(error!, style: const TextStyle(color: clay)),
+                    ),
+                  ),
+                FilledButton.icon(
+                  onPressed: saving || widget.controller.offline ? null : save,
+                  icon: Icon(saving ? Icons.hourglass_top : Icons.check),
+                  label: Text(saving ? 'Recording…' : 'Record payment'),
+                ),
+              ],
             ),
           ),
         ],

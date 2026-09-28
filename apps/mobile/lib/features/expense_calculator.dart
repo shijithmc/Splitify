@@ -75,20 +75,13 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
       appBar: AppBar(title: const Text('Calculator')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'A little maths, made easy.',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('Add up the bill, then bring the total back.'),
-                  const SizedBox(height: 24),
                   TextField(
                     key: const Key('calculator-expression'),
                     controller: expression,
@@ -115,17 +108,17 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: HisaabColors.mint,
-                      borderRadius: BorderRadius.circular(24),
+                      color: HisaabColors.surface,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Semantics(
                       liveRegion: true,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('TOTAL'),
+                          const Text('Total'),
                           const SizedBox(height: 8),
                           Text(
                             result == null ? '—' : money(result),
@@ -145,7 +138,7 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   for (final row in const [
                     ['7', '8', '9', '÷'],
                     ['4', '5', '6', '×'],

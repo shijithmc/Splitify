@@ -104,18 +104,13 @@ class SectionTitle extends StatelessWidget {
   const SectionTitle(this.title, {super.key, this.trailing});
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 28, bottom: 14),
+    padding: const EdgeInsets.only(top: 20, bottom: 8),
     child: Row(
       children: [
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              fontFamily: 'Outfit',
-              fontSize: 21,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -.5,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
         ),
         ?trailing,
@@ -140,20 +135,20 @@ class EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           if (illustrationAsset case final asset?)
-            EditorialArtwork(asset: asset, height: 180)
+            EditorialArtwork(asset: asset, height: 100)
           else
             ExcludeSemantics(
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: HisaabColors.lilac,
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, size: 44, color: HisaabColors.primary),
+                child: Icon(icon, size: 32, color: HisaabColors.primary),
               ),
             ),
           const SizedBox(height: 16),
@@ -179,8 +174,9 @@ class PageBody extends StatelessWidget {
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 640),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         physics: const AlwaysScrollableScrollPhysics(),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: children,
       ),
     ),

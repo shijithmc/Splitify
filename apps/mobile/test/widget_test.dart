@@ -62,7 +62,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Attach receipt'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ListTile, 'Goa, here we come'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(ListTile, 'Goa, here we come'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(
         tester
@@ -79,7 +84,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Settle up'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ListTile, 'Goa, here we come'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(ListTile, 'Goa, here we come'),
+        ),
+      );
       await tester.pumpAndSettle();
       final payment = tester.widget<SettlementPage>(
         find.byType(SettlementPage),
@@ -172,11 +182,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).at(0), 'Test chai');
       await tester.scrollUntilVisible(
-        find.text('Open calculator'),
+        find.byTooltip('Open calculator'),
         180,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Open calculator'));
+      await tester.tap(find.byTooltip('Open calculator'));
       await tester.pumpAndSettle();
       expect(controller.protectedDepth, 3);
       await tester.enterText(
