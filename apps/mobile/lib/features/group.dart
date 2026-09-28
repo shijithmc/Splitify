@@ -222,15 +222,20 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                     children: [
                       if (!group!.archived)
                         OutlinedButton.icon(
-                          onPressed: () async {
-                            await openPage(
-                              context,
-                              c,
-                              ReceiptCapturePage(controller: c, group: group!),
-                            );
-                            await load();
-                            await c.refresh();
-                          },
+                          onPressed: c.offline
+                              ? null
+                              : () async {
+                                  await openPage(
+                                    context,
+                                    c,
+                                    ReceiptCapturePage(
+                                      controller: c,
+                                      group: group!,
+                                    ),
+                                  );
+                                  await load();
+                                  await c.refresh();
+                                },
                           icon: const Icon(Icons.attach_file_rounded, size: 18),
                           label: const Text('Attach receipt'),
                         ),
@@ -297,108 +302,91 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     final g = group!;
     final me = g.participant(c.userId);
     final net = me == null ? 0 : g.netFor(me);
+    final hasBalances = me != null && g.pairs(me).values.any((v) => v != 0);
     final type = g.type == 'Direct' ? 'With a friend' : g.type;
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: HisaabColors.line),
+        color: net < 0 ? HisaabColors.peach : HisaabColors.mint,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          EditorialArtwork(
-            asset: g.type == 'Home'
-                ? 'assets/illustrations/shared-home.png'
-                : 'assets/illustrations/moments.png',
-            height: 148,
-            borderRadius: BorderRadius.zero,
-            fit: BoxFit.cover,
+          Text(
+            '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
+            style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(g.name, style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 6),
-                Text(
-                  '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: HisaabColors.muted,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: net < 0 ? HisaabColors.peach : HisaabColors.mint,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        net == 0
-                            ? 'All settled up'
-                            : net > 0
-                            ? 'You get back'
-                            : 'You owe',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: HisaabColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        money(net.abs()),
-                        style: const TextStyle(
-                          fontFamily: 'Outfit',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 38,
-                          color: HisaabColors.ink,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  g.archived
-                      ? 'History stays here. Reopen the group to add expenses.'
-                      : 'Good times. Shared fairly. Everyone has the same record.',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: HisaabColors.muted,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 12),
+          Text(
+            net == 0
+                ? hasBalances
+                      ? 'No net balance'
+                      : 'You are settled up'
+                : net > 0
+                ? 'You get back'
+                : 'You owe',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              money(net.abs()),
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.w600,
+                fontSize: 38,
+                color: HisaabColors.ink,
+                letterSpacing: -1,
+              ),
             ),
           ),
+          if (g.archived || (net == 0 && hasBalances)) ...[
+            const SizedBox(height: 12),
+            Text(
+              g.archived
+                  ? 'Reopen the group to add expenses.'
+                  : 'You owe and are owed the same amount. Check Balances before settling up.',
+              style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+            ),
+          ],
         ],
       ),
     );
   }
 
+  String _expenseShare(Expense expense) {
+    final me = group!.participant(c.userId);
+    if (me == null ||
+        (expense.payer != me && !expense.shares.containsKey(me))) {
+      return 'You were not involved';
+    }
+    final share = expense.shares[me] ?? 0;
+    final lent = expense.payer == me ? expense.amount - share : 0;
+    return lent > 0 ? 'You lent ${money(lent)}' : 'Your share ${money(share)}';
+  }
+
   List<Widget> _expenseList() => [
     if (expenses.isEmpty)
-      const EmptyCard(
+      EmptyCard(
         icon: Icons.receipt_long_outlined,
-        title: 'Your first shared moment',
-        body: 'Add an expense and choose how to split it.',
+        title: 'No expenses yet',
+        body: 'Add a bill, choose who paid, and split it with your group.',
+        action: group!.archived
+            ? null
+            : FilledButton.icon(
+                onPressed: c.offline ? null : () => editExpense(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add the first expense'),
+              ),
       ),
     ...expenses.map(
       (e) => Card(
         margin: const EdgeInsets.only(bottom: 10),
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
+            horizontal: 16,
             vertical: 10,
           ),
           leading: e.receiptId != null && !e.deleted
@@ -421,13 +409,24 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               decoration: e.deleted ? TextDecoration.lineThrough : null,
             ),
           ),
-          subtitle: Text(
-            '${group!.memberName(e.payer)} paid · ${e.date}${e.deleted ? '\nDeleted · tap to restore' : ''}',
-            style: const TextStyle(fontSize: 14),
-          ),
-          trailing: Text(
-            money(e.amount),
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(
+                '${group!.memberName(e.payer)} paid ${money(e.amount)} · ${e.date}',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                e.deleted ? 'Deleted · tap to restore' : _expenseShare(e),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: e.deleted ? HisaabColors.muted : HisaabColors.ink,
+                ),
+              ),
+            ],
           ),
           onTap: () => expenseDetails(e),
         ),
@@ -439,6 +438,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
   List<Widget> _balanceList() => [
     ...group!.members.map((m) {
       final net = group!.netFor(m.id);
+      final hasBalances = group!.pairs(m.id).values.any((v) => v != 0);
       return Card(
         margin: const EdgeInsets.only(bottom: 10),
         child: ExpansionTile(
@@ -460,7 +460,9 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               const SizedBox(height: 4),
               Text(
                 net == 0
-                    ? 'Settled'
+                    ? hasBalances
+                          ? 'No net balance · see details'
+                          : 'Settled'
                     : net > 0
                     ? 'is owed ${money(net)}'
                     : 'owes ${money(-net)}',
@@ -979,20 +981,56 @@ class _SettlementPageState extends State<SettlementPage> {
   bool saving = false;
   String? error;
   Group get g => widget.group;
+  bool canRecord(Member payer, Member recipient) {
+    final userId = widget.controller.userId;
+    final actor = g.members.where((m) => m.userId == userId).firstOrNull;
+    if (actor == null || actor.deleted) return false;
+    if (payer.userId == userId || recipient.userId == userId) return true;
+    return g.creatorId == userId &&
+        !actor.left &&
+        [payer, recipient].any((m) => m.placeholder || m.external || m.deleted);
+  }
+
+  List<Member> get payers =>
+      g.members.where((m) => recipients(m.id).isNotEmpty).toList();
+
+  List<Member> recipients(String? payerId) {
+    final payer = g.members.where((m) => m.id == payerId).firstOrNull;
+    if (payer == null) return [];
+    return g.members
+        .where((m) => (g.pairs(payer.id)[m.id] ?? 0) < 0 && canRecord(payer, m))
+        .toList();
+  }
+
+  void selectPayer(String payer, {String? recipient}) {
+    from = payer;
+    final available = recipients(payer);
+    to = available.any((m) => m.id == recipient)
+        ? recipient
+        : available.firstOrNull?.id;
+    updateAmount();
+  }
+
+  void updateAmount() {
+    amount.text = from == null || to == null
+        ? ''
+        : decimal(-(g.pairs(from!)[to] ?? 0));
+    error = null;
+  }
+
   @override
   void initState() {
     super.initState();
     final me = g.participant(widget.controller.userId);
-    final debt = me == null
-        ? null
-        : g.pairs(me).entries.where((p) => p.value < 0).firstOrNull;
-    if (debt != null) {
-      from = me;
-      to = debt.key;
-      amount.text = decimal(-debt.value);
-    } else {
-      from = g.members.firstOrNull?.id;
-      to = g.members.length > 1 ? g.members[1].id : null;
+    final incoming = payers
+        .where((m) => (g.pairs(m.id)[me] ?? 0) < 0)
+        .firstOrNull;
+    if (me != null && payers.any((m) => m.id == me)) {
+      selectPayer(me);
+    } else if (incoming != null) {
+      selectPayer(incoming.id, recipient: me);
+    } else if (payers.isNotEmpty) {
+      selectPayer(payers.first.id);
     }
   }
 
@@ -1006,13 +1044,38 @@ class _SettlementPageState extends State<SettlementPage> {
   Widget build(BuildContext context) {
     final payer = from == null ? null : g.memberName(from!);
     final recipient = to == null ? null : g.memberName(to!);
+    if (payers.isEmpty) {
+      final hasBalances = g.members.any(
+        (m) => g.pairs(m.id).values.any((value) => value != 0),
+      );
+      return Scaffold(
+        appBar: AppBar(title: const Text('Settle up')),
+        body: PageBody(
+          children: [
+            EmptyCard(
+              icon: Icons.check_circle_outline,
+              title: hasBalances
+                  ? 'No payments for you to record'
+                  : 'Everyone is settled up',
+              body: hasBalances
+                  ? 'Only the people involved can record these payments.'
+                  : 'There are no outstanding balances in ${g.name}.',
+              action: OutlinedButton(
+                onPressed: () => Navigator.maybePop(context),
+                child: const Text('Back to group'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Settle up')),
       body: PageBody(
         children: [
           const SizedBox(height: 8),
           Text(
-            'Paid them back?',
+            'Record a payment',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium,
           ),
@@ -1093,33 +1156,56 @@ class _SettlementPageState extends State<SettlementPage> {
               labelText: 'Who paid?',
               prefixIcon: Icon(Icons.north_east),
             ),
-            items: g.members
+            items: payers
                 .map(
                   (m) => DropdownMenuItem(
                     value: m.id,
-                    child: Text(m.name, overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      g.memberName(m.id),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 )
                 .toList(),
-            onChanged: (v) => setState(() => from = v),
+            onChanged: saving
+                ? null
+                : (v) {
+                    if (v != null) {
+                      setState(() => selectPayer(v, recipient: to));
+                    }
+                  },
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             isExpanded: true,
+            key: ValueKey('recipient-$from-$to'),
             initialValue: to,
             decoration: const InputDecoration(
               labelText: 'Who received?',
               prefixIcon: Icon(Icons.south_west),
             ),
-            items: g.members
+            items: recipients(from)
                 .map(
                   (m) => DropdownMenuItem(
                     value: m.id,
-                    child: Text(m.name, overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      g.memberName(m.id),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 )
                 .toList(),
-            onChanged: (v) => setState(() => to = v),
+            onChanged: saving
+                ? null
+                : (v) => setState(() {
+                    to = v;
+                    updateAmount();
+                  }),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Choose an outstanding balance you can record. Partial payments are welcome.',
+            style: TextStyle(fontSize: 14, color: HisaabColors.muted),
           ),
           const SectionTitle('Paid with'),
           Wrap(
