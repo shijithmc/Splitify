@@ -113,12 +113,12 @@ public sealed class ReceiptOrchestrationTests
     }
 
     [Fact]
-    public async Task RuntimeEmergencyStopBlocksPaidAndFreeAndBudgetOnlyPausesFree()
+    public async Task RuntimeEmergencyStopAndBudgetBlockPaidAndFree()
     {
         var c=await ReceiptTestContext.Create();await c.Store.TransactAsync([StoreMutation.Put(StoreRow.Create("OPERATIONS","RECEIPTS",1,new ReceiptRuntimeControl(true)),null)]);
         Assert.Equal("scan_paused",(await Assert.ThrowsAsync<DomainException>(()=>c.Budget.AdmitAsync(true,default))).Code);
         await c.Store.TransactAsync([StoreMutation.Delete("OPERATIONS","RECEIPTS",1),StoreMutation.Put(StoreRow.Create("RECEIPT_BUDGET",DateTimeOffset.UtcNow.ToString("yyyyMM"),1,new ReceiptBudget(10_000_000,1000)),null)]);
-        await Assert.ThrowsAsync<DomainException>(()=>c.Budget.AdmitAsync(false,default));Assert.NotEmpty(await c.Budget.AdmitAsync(true,default));
+        await Assert.ThrowsAsync<DomainException>(()=>c.Budget.AdmitAsync(false,default));await Assert.ThrowsAsync<DomainException>(()=>c.Budget.AdmitAsync(true,default));
     }
     [Fact]
     public async Task FiveProviderFailuresOpenCircuit()

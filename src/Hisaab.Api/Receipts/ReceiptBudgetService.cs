@@ -13,10 +13,10 @@ public sealed class ReceiptBudgetService(IAtomicStore store,IConfiguration confi
         var ceiling=checked((long)decimal.Ceiling(configured*1_000_000m));var charge=checked((long)decimal.Ceiling(perAttempt*1_000_000m));
         var month=DateTimeOffset.UtcNow.ToString("yyyyMM",System.Globalization.CultureInfo.InvariantCulture);var row=await store.GetAsync("RECEIPT_BUDGET",month,ct);var budget=row?.Deserialize<ReceiptBudget>()??new(0,0);
         if(budget.CircuitUntil>DateTimeOffset.UtcNow)throw new DomainException(503,"scan_circuit_open","Reading bills is temporarily unavailable. Enter manually.");
-        if(!paid&&checked(budget.ReservedMicrousd+charge)>ceiling)throw new DomainException(503,"scan_paused","Free scanning is paused. Enter manually.");
+        if(checked(budget.ReservedMicrousd+charge)>ceiling)throw new DomainException(503,"scan_paused","Scanning is paused. Enter manually.");
         var updated=budget with{ReservedMicrousd=checked(budget.ReservedMicrousd+charge),Attempts=checked(budget.Attempts+1),Alarm80=budget.Alarm80||budget.ReservedMicrousd+charge>=ceiling*0.8m};
         // Conservative per-attempt liability remains charged even after timeout/failure; actual
-        // provider billing can lag. Paid scans may pass the free-tier budget threshold.
+        // provider billing can lag. Every plan shares this hard admission ceiling.
         return [StoreMutation.Condition("OPERATIONS","RECEIPTS",control?.Version),StoreMutation.Put(StoreRow.Create("RECEIPT_BUDGET",month,(row?.Version??0)+1,updated),row?.Version)];
     }
     public async Task<IReadOnlyList<StoreMutation>> OutcomeAsync(bool providerFailure,CancellationToken ct)

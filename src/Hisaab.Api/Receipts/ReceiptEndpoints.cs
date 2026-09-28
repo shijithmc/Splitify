@@ -2,6 +2,7 @@ using Hisaab.Api.Identity;
 using Hisaab.Domain.Receipts;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
+using Hisaab.Api.Shared;
 namespace Hisaab.Api.Receipts;
 
 public static class ReceiptEndpoints
@@ -12,10 +13,10 @@ public static class ReceiptEndpoints
         static string Key(HttpContext ctx)=>ctx.Request.Headers["Idempotency-Key"].ToString();
         app.MapGet("/v1/receipts/allowance",(HttpContext ctx,ReceiptService receipts,CancellationToken ct)=>receipts.AllowanceAsync(Current(ctx),ct));
         app.MapPut("/v1/receipts/consent",(HttpContext ctx,ReceiptConsentRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.ConsentAsync(Current(ctx),Key(ctx),input,ct));
-        app.MapPost("/v1/groups/{groupId}/receipts",(HttpContext ctx,string groupId,ReceiptCreateRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.CreateAsync(Current(ctx),Key(ctx),groupId,input,ct));
+        app.MapPost("/v1/groups/{groupId}/receipts",(HttpContext ctx,string groupId,ReceiptCreateRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.CreateAsync(Current(ctx),Key(ctx),groupId,input,ct)).WithMetadata(new AiRequestRateLimit());
         app.MapGet("/v1/receipts/{id}",(HttpContext ctx,string id,ReceiptService receipts,CancellationToken ct)=>receipts.GetAsync(Current(ctx),id,ct));
-        app.MapPost("/v1/receipts/{id}/complete",(HttpContext ctx,string id,ReceiptVersionRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.CompleteAsync(Current(ctx),Key(ctx),id,input,ct));
-        app.MapPost("/v1/receipts/{id}/retry",(HttpContext ctx,string id,ReceiptVersionRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.RetryAsync(Current(ctx),Key(ctx),id,input,ct));
+        app.MapPost("/v1/receipts/{id}/complete",(HttpContext ctx,string id,ReceiptVersionRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.CompleteAsync(Current(ctx),Key(ctx),id,input,ct)).WithMetadata(new AiRequestRateLimit());
+        app.MapPost("/v1/receipts/{id}/retry",(HttpContext ctx,string id,ReceiptVersionRequest input,ReceiptService receipts,CancellationToken ct)=>receipts.RetryAsync(Current(ctx),Key(ctx),id,input,ct)).WithMetadata(new AiRequestRateLimit());
         app.MapPost("/v1/receipts/{id}/preview",async(HttpContext ctx,string id,ReceiptReview input,ReceiptAccess access,CancellationToken ct)=>
         {
             var receipt=(await access.ReceiptAsync(Current(ctx),id,false,ct)).Deserialize<ReceiptRecord>();var group=(await access.GroupAsync(receipt.GroupId,Current(ctx).User.Id,ct)).Deserialize<Group>();

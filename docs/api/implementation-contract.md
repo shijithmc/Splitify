@@ -2,6 +2,8 @@
 
 JSON uses camelCase. Money is integer paise; dates YYYY-MM-DD; timestamps UTC ISO-8601. Enums serialize as strings. Authentication: Bearer access token. Ledger/group/device/preferences mutations require `Idempotency-Key` header (UUID). Identity operations, account deletion and server billing refresh have their own state/credential checks. Errors: `{ code, message, correlationId }` with appropriate HTTP status.
 
+All endpoints have shared per-IP rate limits before authentication and per-account limits after authentication. AI receipt create/complete/retry routes share tighter limits. HTTP 429 responses include `Retry-After`; see [API abuse protection](../runbooks/api-rate-limits.md) for ceilings, counter semantics and rollout verification.
+
 ## HTTP API (under /v1)
 
 - POST /auth/dev `{displayName}` -> session (Development + explicit DevAuth only).
