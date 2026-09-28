@@ -159,9 +159,17 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> login(String provider) async {
+  Future<void> login(String provider) => _login((repo) async {
+    final credential = await identity.credential(repo, provider);
+    return repo.request('POST', '/auth/sign-in', credential);
+  });
+
+  Future<void> loginPhone(Future<Json?> Function(ApiRepository) verify) =>
+      _login(verify);
+
+  Future<void> _login(Future<Json?> Function(ApiRepository) verify) async {
     if (loading) return;
-    ++_accountEpoch;
+    final epoch = ++_accountEpoch;
     loading = true;
     error = null;
     notifyListeners();
@@ -174,21 +182,25 @@ class AppController extends ChangeNotifier {
       final repo = repository is ApiRepository
           ? repository as ApiRepository
           : ApiRepository(AppConfig.apiUrl);
-      final credential = await identity.credential(repo, provider);
-      final session = await repo.request('POST', '/auth/sign-in', credential);
-      await repo.saveSession(session);
-      repository = repo;
-      user = object(session['user']);
-      entitlement = object(session['entitlement']);
-      await refresh();
-      await _nativeIdentity();
+      final session = await verify(repo);
+      if (epoch != _accountEpoch) return;
+      if (session != null) {
+        await repo.saveSession(session);
+        repository = repo;
+        user = object(session['user']);
+        entitlement = object(session['entitlement']);
+        await refresh();
+        await _nativeIdentity();
+      }
     } on IdentityCancelled {
       // Closing the native account chooser returns to sign-in without an error.
     } catch (e) {
-      error = '$e';
+      if (epoch == _accountEpoch) error = '$e';
     }
-    loading = false;
-    notifyListeners();
+    if (epoch == _accountEpoch) {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> startDemo() async {
@@ -396,6 +408,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout({bool deleted = false}) async {
     ++_accountEpoch;
+    loading = false;
     pendingNotification = null;
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();

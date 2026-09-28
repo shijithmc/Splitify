@@ -1,6 +1,21 @@
-# Google and Apple authentication
+# Google, Apple and phone authentication
 
 The source implements provider sign-in, server verification, rotating Hisaab sessions, credential linking and account deletion. Live readiness requires completed provider registrations, a reachable API, signing and the device checks below. Demo mode, mock tests and unsigned simulator builds do not verify those dependencies.
+
+## Configure phone OTP
+
+Phone sign-in uses Twilio Verify from the backend. The app accepts an international phone number with its country code, requests an SMS and submits the six-digit code. The server binds proof to the phone number, challenge purpose and, for linking or reauthentication, the current account. A typed number is never proof of ownership and does not claim invitations. Separate existing accounts are not merged.
+
+1. In the environment's Twilio account, create a Verify service, enable SMS and set the code length to **six digits**. Create an API key authorized to create and check verifications in that service. Keep the key secret entirely in backend configuration. The app needs only its existing `API_BASE_URL`. [Twilio Verify services](https://www.twilio.com/docs/verify/api/service)
+2. Allow only supported destinations in **Verify Geo Permissions** and confirm delivery in each intended country. Leave Fraud Guard enabled and set provider usage alerts and operational spending limits. Application admission limits below complement these settings. [Verify deliverability](https://www.twilio.com/docs/verify/verify-countries-and-regions-deliverability), [Verify fraud prevention](https://www.twilio.com/docs/verify/preventing-toll-fraud)
+3. For India, confirm with Twilio which Verify delivery route and sender/template setup apply to the account. Twilio documents different international and domestic routes; domestic routing includes DLT company and sender registration. Do not assume a generic Verify service has completed the environment's required setup. [Twilio India SMS guidelines](https://www.twilio.com/en-us/guidelines/in/sms)
+4. Populate `Hisaab:Auth:Phone:ServiceSid`, `ApiKeySid` and `ApiKeySecret` in the existing backend secret, then set `Hisaab:Auth:Phone:Enabled` to `true` and restart the API. The service defaults to disabled and returns a sanitized unavailable response when missing configuration. No SMS credentials belong in Dart defines, assets or source control.
+
+`Hisaab:Auth:Phone:MaxSmsPerDay` defaults to `100`; `MaxSmsPerMinute` defaults to `10`. These bound application SMS attempts across the environment, including failed sends. Keep configuration identical across API instances. Additional per-number/IP limits and verification ceilings are listed in [API abuse protection](api-rate-limits.md#phone-otp). A provider-accepted send does not prove delivery. Recheck Twilio trial restrictions before using a trial account for acceptance; trial recipients and countries can be restricted. [Twilio trial account setup](https://www.twilio.com/docs/usage/tutorials/how-to-use-your-free-trial-account)
+
+Phone OTP also requires the existing `Hisaab:EncryptionKey` and `Hisaab:ContactHashKey`. Challenges keep the phone encrypted, expire after ten minutes and allow at most five code checks; the backend never stores the OTP. The persistent phone identity is a keyed hash. Preserve `ContactHashKey` across deployments: changing it changes phone identity lookup and requires a separately planned migration. Keep phone numbers, codes, nonces, provider payloads and credentials out of request logs and acceptance reports.
+
+Use an explicitly linked Google or Apple method to retain another way into a phone account. This implementation does not add phone-number change/recovery or account merging. A phone number can be reassigned by its carrier; the account identity follows possession of the linked number until a separately designed recovery flow exists.
 
 ## Register Google clients
 
@@ -31,8 +46,10 @@ Copy `apps/mobile/config/example.json` to ignored `apps/mobile/config/production
 | Apple registered return URL | `APPLE_REDIRECT_URI` | `Hisaab:Auth:apple:RedirectUri`, exactly identical. |
 | Installed Android package | Gradle `applicationId` | `Hisaab:Auth:apple:AndroidPackage`. |
 | Apple credentials | Backend only | `Hisaab:Auth:apple:TeamId`, `KeyId`, `PrivateKey`. |
-| Token encryption key | Backend only | `Hisaab:EncryptionKey`: base64 encoding of 32 random bytes. Preserve it to decrypt existing Apple refresh tokens. |
-| Contact lookup secret | Backend only | `Hisaab:ContactHashKey`: independent high-entropy secret. |
+| Phone SMS verification | Backend only | `Hisaab:Auth:Phone:Enabled`, `ServiceSid`, `ApiKeySid`, `ApiKeySecret`; configure a six-digit Twilio Verify service. |
+| SMS attempt ceilings | Backend only | `Hisaab:Auth:Phone:MaxSmsPerDay` (default `100`), `MaxSmsPerMinute` (default `10`). |
+| Token encryption key | Backend only | `Hisaab:EncryptionKey`: base64 encoding of 32 random bytes. Preserve it to decrypt existing Apple refresh tokens and phone challenges. |
+| Contact lookup / phone identity secret | Backend only | `Hisaab:ContactHashKey`: independent high-entropy secret; preserve it for stable phone identity lookup. |
 
 For hosted operation, use the existing [infrastructure configuration](../../infra/Hisaab.Cdk/README.md). Supply an existing secret ARN through `ConfigurationSecretArn` (or `Hisaab__SecretsArn` outside CDK). The loader requires a **flat JSON object with string values**, for example:
 
@@ -46,6 +63,12 @@ For hosted operation, use the existing [infrastructure configuration](../../infr
   "Hisaab:Auth:apple:TeamId": "<team-id>",
   "Hisaab:Auth:apple:KeyId": "<key-id>",
   "Hisaab:Auth:apple:PrivateKey": "<PEM private key with JSON-escaped newlines>",
+  "Hisaab:Auth:Phone:Enabled": "false",
+  "Hisaab:Auth:Phone:ServiceSid": "<verify-service-sid>",
+  "Hisaab:Auth:Phone:ApiKeySid": "<api-key-sid>",
+  "Hisaab:Auth:Phone:ApiKeySecret": "<api-key-secret>",
+  "Hisaab:Auth:Phone:MaxSmsPerDay": "100",
+  "Hisaab:Auth:Phone:MaxSmsPerMinute": "10",
   "Hisaab:EncryptionKey": "<base64-32-random-bytes>",
   "Hisaab:ContactHashKey": "<independent-random-secret>"
 }
@@ -62,6 +85,9 @@ Use dedicated test accounts and record build, OS, platform, API environment and 
 - [ ] Google: new and returning account on iOS and Android, including the actual Play-installed signing configuration before release.
 - [ ] Apple: new and returning account on iOS; repeat with Hide My Email and confirm repeat sign-in tolerates missing name information.
 - [ ] Apple on Android: browser consent returns to the app through the registered callback; code exchange succeeds; cancel/back returns safely without a Hisaab session.
+- [ ] Phone: new and returning account on signed iOS and Android installations using an authorized SMS recipient; record delivery and sign-in result for each intended country/carrier.
+- [ ] Phone: malformed number, incorrect/expired code, repeated submit, resend cooldown, send/verify limits, provider outage and disabled configuration produce safe errors without a session.
+- [ ] Phone: link after reauthentication, sign out and return through either linked method; a number owned by another account fails without merging. Confirm phone reauthentication for linking and disposable-account deletion preserves the current account.
 - [ ] Relaunch and session refresh preserve the same account; sign-out followed by another account exposes no previous account's cached data.
 - [ ] Link the second provider after reauthentication, then sign in through either method and reach the same Hisaab account. A provider linked to a different account must fail without silently merging.
 - [ ] Cancel, network failure and expired/reused challenge leave the user signed out or preserve their existing authenticated account as appropriate.

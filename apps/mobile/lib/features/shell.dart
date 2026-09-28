@@ -6,12 +6,14 @@ import '../core/controller.dart';
 import '../core/design.dart';
 import '../core/models.dart';
 import '../core/money.dart';
+import '../core/phone_auth.dart';
 import '../main.dart';
 import 'group.dart';
 import 'settings.dart';
 import 'shared.dart';
 import 'receipts.dart';
 import 'receipt_viewer.dart';
+import 'phone_sign_in.dart';
 
 class AppShell extends StatefulWidget {
   final AppController controller;
@@ -1117,6 +1119,26 @@ class _WelcomeState extends State<Welcome> {
                       : null,
                   icon: const Icon(Icons.apple),
                   label: const Text('Continue with Apple'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: AppConfig.configured
+                      ? () => widget.controller.loginPhone(
+                          (repo) => Navigator.of(context).push<Json>(
+                            MaterialPageRoute(
+                              builder: (_) => PhoneSignInPage(
+                                service: PhoneAuthService(
+                                  repo,
+                                  isCurrent: () =>
+                                      mounted && !widget.controller.signedIn,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : null,
+                  icon: const Icon(Icons.phone_outlined),
+                  label: const Text('Continue with phone'),
                 ),
               ],
               if (widget.controller.pendingInvite != null)

@@ -1,6 +1,6 @@
 # Hisaab mobile
 
-Flutter app for iOS and Android. Includes onboarding, native Google/Apple identity, groups and direct friends, placeholder invitations, all four split modes, expense revisions, 90-day external-member review, invitation revocation, balance views, recorded payments/disputes, activity, preferences, account deletion, RevenueCat purchase/restore, and consent-gated AdMob banners.
+Flutter app for iOS and Android. Includes onboarding, native Google/Apple identity and phone OTP, groups and direct friends, placeholder invitations, all four split modes, expense revisions, 90-day external-member review, invitation revocation, balance views, recorded payments/disputes, activity, preferences, account deletion, RevenueCat purchase/restore, and consent-gated AdMob banners.
 
 ## Illustrated interface
 
@@ -65,6 +65,8 @@ Follow the [authentication runbook](../../docs/runbooks/authentication.md) for p
 
 Google/Apple identity tokens are sent to `/auth/sign-in`; only the server issues the Hisaab session. Apple uses a per-attempt SHA-256 nonce. Google Sign-In v7 supports nonce only during its mandatory once-per-process initialization, so this implementation uses Google issuer/audience/lifetime verification plus a fresh one-use server challenge, without asserting Google token nonce binding. Account linking first reauthenticates a currently linked method and checks the same Hisaab account, then verifies the newly linked provider. Existing conflicting accounts are not silently merged. Account deletion reauthenticates a linked provider and verifies the same Hisaab account immediately before submitting deletion.
 
+Phone sign-in requests an SMS code from `/auth/phone/challenge`, then submits the code and returned nonce to `/auth/sign-in` using provider `phone`. The phone flow also supports linking and reauthentication before account deletion. Twilio Verify secrets and delivery configuration stay on the server; no additional mobile provider key or SMS-reading permission is needed. Backend configuration and signed-device SMS acceptance remain pending; see the [phone setup](../../docs/runbooks/authentication.md#configure-phone-otp) and [API contract](../../docs/api/implementation-contract.md).
+
 For iOS, configure `GOOGLE_REVERSED_CLIENT_ID` and `ADMOB_APP_ID` through ignored `ios/Flutter/Local.xcconfig` or CI build settings. The committed AdMob application ID is Google's **test application ID**, not a live account. Configure the registered bundle ID and Apple Sign In capability in Xcode; select your signing team. No developer team is committed. Add Google URL scheme and OAuth audiences that match the backend configuration. The Android Apple callback activity and backend `/v1/auth/apple/callback` handler are included; register that HTTPS URL with Apple and set the backend's `AndroidPackage` to the installed package. The handler validates state and returns the SDK's `signinwithapple` intent URL. Backend token verification and code exchange still apply; code exchange sends `redirect_uri` for the configured Services ID only, leaving native iOS exchange without it.
 
 Android's AdMob app ID can be supplied as Gradle property `ADMOB_APP_ID`; the default is Google's test app ID. Configure signing fingerprints/OAuth clients for your registered package `app.hisaab.hisaab`. Release artifacts are intentionally **not signed with a debug key**; supply proper store signing before distribution. Android backups are disabled to avoid restoring account tokens onto another installation.
@@ -79,7 +81,7 @@ Banners are allowed only on Home, Groups and Activity. Navigation into details, 
 
 ## Release verification remaining
 
-Real Apple/Google sign-in and linking, Android Apple callback, sandbox purchase/refund/grace/restore across stores/accounts, notifications, permission/consent behavior, signing, accessibility on physical devices and store approval require external configuration. No cloud resources, store products or production ads are enabled by this app's default build.
+Real Apple/Google/phone sign-in and linking, Twilio SMS delivery, Android Apple callback, sandbox purchase/refund/grace/restore across stores/accounts, notifications, permission/consent behavior, signing, accessibility on physical devices and store approval require external configuration. No cloud resources, store products or production ads are enabled by this app's default build.
 
 
 Invitation links use `hisaab://invite/{token}` by default. Initial and foreground links are allowlisted and the pending bearer token is kept in secure storage until sign-in; joining always requires explicit acceptance. It is cleared on acceptance, decline or sign-out. HTTPS invites require the same host in Dart `INVITE_HOST` and Android Gradle `INVITE_HOST`, an `assetlinks.json` association on the host, and iOS Associated Domains (`applinks:your-host`) plus its Apple App Site Association document. Configure the server `Hisaab:InviteBaseUrl` to that host’s `/invite` path. Unrecognized schemes/hosts are ignored. Apple Android web authentication sends and validates the server challenge as `state` as well as the hashed identity-token nonce.
