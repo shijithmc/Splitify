@@ -119,9 +119,9 @@ void main() {
     'phone sign-in sends a normalized number and returns the verified result',
     (tester) async {
       await open(tester);
-      expect(find.text('Sign in with your phone'), findsOneWidget);
+      expect(find.text('Your number, please'), findsOneWidget);
       expect(
-        find.textContaining('then link your phone in Settings'),
+        find.textContaining('then link your phone in Account'),
         findsOneWidget,
       );
       await tester.enterText(
@@ -330,8 +330,15 @@ void main() {
       addTearDown(tester.view.resetViewInsets);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await open(tester);
+      final sendButton = find.widgetWithText(FilledButton, 'Send code');
+      expect(tester.getBottomLeft(sendButton).dy, lessThanOrEqualTo(318));
       await sendCode(tester);
       expect(find.byKey(const Key('phone-code')), findsOneWidget);
+      final verifyButton = find.widgetWithText(
+        FilledButton,
+        'Verify and sign in',
+      );
+      expect(tester.getBottomLeft(verifyButton).dy, lessThanOrEqualTo(318));
       await tester.scrollUntilVisible(
         find.text('Change phone number'),
         200,

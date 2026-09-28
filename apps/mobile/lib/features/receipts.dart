@@ -253,6 +253,21 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
               rows(server['media']).isNotEmpty);
       return Scaffold(
         appBar: AppBar(title: const Text('Attach receipt')),
+        bottomNavigationBar: !loading && draft != null && capturing
+            ? _ReceiptFooter(
+                note:
+                    '${images.length} of 3 images · You enter the bill details',
+                child: FilledButton.icon(
+                  onPressed: images.isEmpty || picking ? null : start,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: Text(
+                    c.offline
+                        ? 'Queue receipt for upload'
+                        : 'Attach photos & enter details',
+                  ),
+                ),
+              )
+            : null,
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : draft == null
@@ -261,10 +276,10 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                 children: [
                   Text(
                     capturing && images.isEmpty
-                        ? 'One bill.\nEveryone’s share.'
+                        ? 'Add the bill'
                         : processing
                         ? 'Your bill is on its way.'
-                        : 'One bill. Everyone’s share.',
+                        : 'Keep the bill with the story.',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 8),
@@ -277,8 +292,8 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                   if (capturing && images.isEmpty) ...[
                     const SizedBox(height: 16),
                     const EditorialArtwork(
-                      asset: 'assets/illustrations/receipt-story.png',
-                      height: 190,
+                      asset: HisaabArt.receipt,
+                      height: 170,
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -357,57 +372,53 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                       'Flatten your bill, avoid glare, and include the total. Up to three photos or the first three PDF pages.',
                     ),
                     const SizedBox(height: 18),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: picking || images.length >= 3
-                              ? null
-                              : capture,
-                          icon: const Icon(Icons.camera_alt_outlined),
-                          label: const Text('Take a photo'),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: picking || images.length >= 3
-                                    ? null
-                                    : () => pick(false),
-                                icon: const Icon(Icons.photo_library_outlined),
-                                label: const Text('Gallery'),
-                              ),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _ReceiptSourceTile(
+                              icon: Icons.camera_alt_rounded,
+                              title: 'Take a photo',
+                              subtitle: 'Use your camera',
+                              color: HisaabColors.lilac,
+                              onTap: picking || images.length >= 3
+                                  ? null
+                                  : capture,
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: picking || images.length >= 3
-                                    ? null
-                                    : () => pick(true),
-                                icon: const Icon(Icons.picture_as_pdf_outlined),
-                                label: const Text('PDF'),
-                              ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _ReceiptSourceTile(
+                              icon: Icons.photo_library_rounded,
+                              title: 'Gallery',
+                              subtitle: 'From your photos',
+                              color: HisaabColors.mint,
+                              onTap: picking || images.length >= 3
+                                  ? null
+                                  : () => pick(false),
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _ReceiptSourceTile(
+                              icon: Icons.picture_as_pdf_rounded,
+                              title: 'PDF',
+                              subtitle: 'Choose a file',
+                              color: HisaabColors.peach,
+                              onTap: picking || images.length >= 3
+                                  ? null
+                                  : () => pick(true),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     if (picking)
                       const Padding(
                         padding: EdgeInsets.all(12),
                         child: LinearProgressIndicator(),
                       ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: images.isEmpty || picking ? null : start,
-                      icon: const Icon(Icons.attach_file_rounded),
-                      label: Text(
-                        c.offline
-                            ? 'Queue receipt for upload'
-                            : 'Attach photos & enter details',
-                      ),
-                    ),
                     if (c.demo)
                       TextButton.icon(
                         onPressed: () async {
@@ -522,6 +533,153 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
               ),
       );
     },
+  );
+}
+
+class _ReceiptSourceTile extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+  const _ReceiptSourceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: onTap != null,
+    child: Material(
+      color: onTap == null ? HisaabColors.surface : color,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+          child: Column(
+            children: [
+              Icon(icon, size: 28, color: HisaabColors.primary),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ReceiptFooter extends StatelessWidget {
+  final Widget child;
+  final String? note, error;
+  const _ReceiptFooter({required this.child, this.note, this.error});
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (error != null) ...[
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                error!,
+                style: const TextStyle(color: HisaabColors.warning),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          child,
+          if (note != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              note!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _ReceiptEditorSheet extends StatefulWidget {
+  final Widget title, content;
+  final List<Widget> actions;
+  // Controllers stay alive until the sheet finishes its closing animation.
+  final List<TextEditingController> controllers;
+  const _ReceiptEditorSheet({
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.controllers = const [],
+  });
+
+  @override
+  State<_ReceiptEditorSheet> createState() => _ReceiptEditorSheetState();
+}
+
+class _ReceiptEditorSheetState extends State<_ReceiptEditorSheet> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .86,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DefaultTextStyle.merge(
+              style: Theme.of(context).textTheme.headlineSmall,
+              child: widget.title,
+            ),
+            const SizedBox(height: 20),
+            Flexible(child: widget.content),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.actions.take(widget.actions.length - 1).toList(),
+            ),
+            const SizedBox(height: 8),
+            widget.actions.last,
+          ],
+        ),
+      ),
+    ),
   );
 }
 
@@ -956,505 +1114,561 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
     return Scaffold(
       key: ValueKey('receipt-review-$formRevision'),
       appBar: AppBar(title: const Text('Review your bill')),
-      body: PageBody(
+      body: Column(
         children: [
-          Text(
-            'Check it. Then split it.',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(g.name, style: const TextStyle(color: HisaabColors.muted)),
-          const SizedBox(height: 18),
-          _ReceiptSteps(current: preview == null ? 1 : 2),
-          const SizedBox(height: 18),
-          if (conflict != null)
-            FilledButton.icon(
-              onPressed: busy ? null : reviewLatest,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Review latest version'),
-            ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: HisaabColors.peach,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: PageBody(
               children: [
-                Icon(Icons.fact_check_outlined, color: HisaabColors.ink),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Check the receipt, amounts, and people before confirming.',
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            preview == null
+                                ? 'Check it. Then split it.'
+                                : 'Looks right?',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            g.name,
+                            style: const TextStyle(color: HisaabColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (MediaQuery.sizeOf(context).width >= 360 &&
+                        MediaQuery.textScalerOf(context).scale(16) <= 22) ...[
+                      const SizedBox(width: 12),
+                      const SizedBox(
+                        width: 100,
+                        child: EditorialArtwork(
+                          asset: HisaabArt.receipt,
+                          height: 90,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _ReceiptSteps(current: preview == null ? 1 : 2),
+                const SizedBox(height: 18),
+                if (conflict != null)
+                  FilledButton.icon(
+                    onPressed: busy ? null : reviewLatest,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Review latest version'),
                   ),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: HisaabColors.peach,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.fact_check_outlined, color: HisaabColors.ink),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Check the receipt, amounts, and people before confirming.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ..._warnings(
+                  object(object(draft['server'])['extraction'])['warnings'],
+                ),
+                if (locked)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'A save is awaiting confirmation. Retry the same save before changing this draft.',
+                      style: TextStyle(color: clay),
+                    ),
+                  ),
+                if (rows(draft['images']).isNotEmpty ||
+                    rows(object(draft['server'])['media']).isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => showImage = !showImage),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: Text(
+                      showImage ? 'Hide bill image' : 'Check bill image',
+                    ),
+                  ),
+                if (showImage)
+                  ...rows(draft['images']).map(
+                    (image) => SizedBox(
+                      height: 250,
+                      child: FutureBuilder<Uint8List>(
+                        future: c.receipts.store.image(image['id']),
+                        builder: (context, snapshot) => snapshot.hasData
+                            ? InteractiveViewer(
+                                maxScale: 6,
+                                child: Image.memory(
+                                  snapshot.data!,
+                                  semanticLabel: 'Bill image, pinch to zoom',
+                                ),
+                              )
+                            : const Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                  ),
+                if (showImage && rows(draft['images']).isEmpty)
+                  ...rows(object(draft['server'])['media']).map(
+                    (image) => SizedBox(
+                      height: 250,
+                      child: FutureBuilder<Uint8List>(
+                        future: c.receipts.media(draft['id'], image),
+                        builder: (context, snapshot) => snapshot.hasData
+                            ? InteractiveViewer(
+                                maxScale: 6,
+                                child: Image.memory(
+                                  snapshot.data!,
+                                  semanticLabel: 'Bill image, pinch to zoom',
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  snapshot.hasError
+                                      ? '${snapshot.error}'
+                                      : 'Loading private image…',
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: review['merchant'] ?? '',
+                  maxLength: 200,
+                  enabled: !locked,
+                  decoration: const InputDecoration(
+                    labelText: 'Merchant / description',
+                  ),
+                  onChanged: (v) => changed(() => review['merchant'] = v),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: review['sourceCurrency'] ?? 'INR',
+                        enabled: !locked,
+                        maxLength: 3,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Bill currency',
+                        ),
+                        onChanged: (v) => changed(
+                          () => review['sourceCurrency'] = v.toUpperCase(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: locked
+                            ? null
+                            : () async {
+                                final selected = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      DateTime.tryParse(review['date'] ?? '') ??
+                                      DateTime.now(),
+                                  firstDate: DateTime(1900),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 365),
+                                  ),
+                                );
+                                if (selected != null) {
+                                  changed(() => review['date'] = day(selected));
+                                }
+                              },
+                        icon: const Icon(Icons.calendar_today, size: 17),
+                        label: Text(review['date'] ?? 'Bill date'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (review['sourceCurrency'] != 'INR') ...[
+                  const Text(
+                    'Foreign bill: Hisaab saves INR only. Convert each item, charge, and total yourself. No exchange rate is applied.',
+                    style: TextStyle(color: clay),
+                  ),
+                  TextFormField(
+                    initialValue: review['sourceGrandTotal'] ?? '',
+                    enabled: !locked,
+                    decoration: const InputDecoration(
+                      labelText: 'Original bill total',
+                    ),
+                    onChanged: (v) =>
+                        changed(() => review['sourceGrandTotal'] = v),
+                  ),
+                  TextFormField(
+                    initialValue: review['sourceSubtotal'] ?? '',
+                    enabled: !locked,
+                    decoration: const InputDecoration(
+                      labelText: 'Original bill subtotal (optional)',
+                    ),
+                    onChanged: (v) => changed(
+                      () => review['sourceSubtotal'] = v.trim().isEmpty
+                          ? null
+                          : v.trim(),
+                    ),
+                  ),
+                  CheckboxListTile(
+                    value: review['convertedToInr'] == true,
+                    title: const Text('I entered converted INR amounts'),
+                    onChanged: locked
+                        ? null
+                        : (v) => changed(
+                            () => review['convertedToInr'] = v == true,
+                          ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _amountField(
+                  'Bill subtotal (INR)',
+                  'subtotalPaise',
+                  optional: true,
+                  locked: locked,
+                ),
+                const SizedBox(height: 12),
+                _amountField(
+                  'Grand total (INR)',
+                  'grandTotalPaise',
+                  locked: locked,
+                ),
+                const SectionTitle('Items'),
+                _ReceiptAllocationSummary(
+                  items: items,
+                  splitByItems: review['splitByItems'] == true,
+                ),
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  const Text(
+                    'No item breakdown yet. Add items or split the grand total.',
+                  ),
+                ...items.asMap().entries.map((entry) {
+                  final item = entry.value;
+                  final low =
+                      item['confidence'] != null &&
+                      (item['confidence'] as num) < .8;
+                  final assigned = (item['assigneeIds'] as List? ?? [])
+                      .cast<String>();
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: low
+                                  ? HisaabColors.peach
+                                  : HisaabColors.mint,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              low
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.check_circle_outline,
+                              color: low
+                                  ? HisaabColors.warning
+                                  : HisaabColors.positive,
+                            ),
+                          ),
+                          title: Text('${item['name']} × ${item['quantity']}'),
+                          subtitle: Text(
+                            '${money(item['lineTotalPaise'] ?? 0)}${low ? ' · Check this reading' : ''}${item['transliteration'] == null ? '' : '\n${item['transliteration']}'}',
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Edit item',
+                            onPressed: locked
+                                ? null
+                                : () => editItem(entry.key),
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                        ),
+                        if (review['splitByItems'] == true) ...[
+                          const Divider(height: 1),
+                          ListTile(
+                            tileColor:
+                                assigned.isEmpty && item['ignored'] != true
+                                ? HisaabColors.peach
+                                : HisaabColors.surface,
+                            minVerticalPadding: 12,
+                            title: Text(
+                              item['ignored'] == true
+                                  ? 'Ignored zero-price item'
+                                  : assigned.isEmpty
+                                  ? 'Unassigned — choose who shared this'
+                                  : assigned.map(g.memberName).join(', '),
+                              style: TextStyle(
+                                color:
+                                    assigned.isEmpty && item['ignored'] != true
+                                    ? clay
+                                    : null,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.people_outline),
+                            onTap: locked ? null : () => assign(entry.key),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+                TextButton.icon(
+                  onPressed: locked || items.length >= 150
+                      ? null
+                      : () => editItem(null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add item'),
+                ),
+                const SectionTitle('Tax, charges & discounts'),
+                ...charges.asMap().entries.map(
+                  (entry) => Card(
+                    child: ListTile(
+                      title: Text(
+                        '${entry.value['name']} · ${money(entry.value['amountPaise'] ?? 0)}',
+                      ),
+                      subtitle: Text(
+                        '${entry.value['confidence'] != null && (entry.value['confidence'] as num) < .8 ? 'Check this reading · ' : ''}${entry.value['includedInItemPrices'] == true
+                            ? 'Already included in item prices'
+                            : object(entry.value['weights']).isEmpty
+                            ? 'Proportional to each person’s items'
+                            : 'Custom allocation weights'}',
+                      ),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: locked ? null : () => editCharge(entry.key),
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: locked || charges.length >= 20
+                      ? null
+                      : () => editCharge(null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add tax / charge / discount'),
+                ),
+                const SectionTitle('Who paid and how to split'),
+                DropdownButtonFormField<String>(
+                  initialValue: payer,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Paid by'),
+                  items: g.members
+                      .where((m) => !m.left && !m.deleted)
+                      .map(
+                        (m) => DropdownMenuItem(
+                          value: m.id,
+                          child: Text(m.userId == c.userId ? 'You' : m.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: locked ? null : (v) => changed(() => payer = v),
+                ),
+                if (expense == null && payer != g.participant(c.userId))
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'The selected payer must confirm an expense with a receipt from their own account.',
+                      style: TextStyle(color: clay),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Split total')),
+                    ButtonSegment(value: true, label: Text('Split by items')),
+                  ],
+                  selected: {review['splitByItems'] == true},
+                  onSelectionChanged: locked
+                      ? null
+                      : (s) => changed(() => review['splitByItems'] = s.first),
+                ),
+                if (review['splitByItems'] != true) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ['Equal', 'Exact', 'Percentage', 'Shares']
+                        .map(
+                          (value) => ChoiceChip(
+                            label: Text(value),
+                            selected: mode == value,
+                            onSelected: locked
+                                ? null
+                                : (_) => changed(() {
+                                    mode = value;
+                                    for (final id in values.keys) {
+                                      values[id] = value == 'Shares' ? '1' : '';
+                                    }
+                                  }),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  ...g.members
+                      .where((m) => !m.left && !m.deleted)
+                      .map(
+                        (member) => Row(
+                          children: [
+                            Checkbox(
+                              value: selected.contains(member.id),
+                              onChanged: locked
+                                  ? null
+                                  : (v) => changed(() {
+                                      if (v == true) {
+                                        selected.add(member.id);
+                                      } else {
+                                        selected.remove(member.id);
+                                      }
+                                    }),
+                            ),
+                            Expanded(child: Text(member.name)),
+                            if (mode != 'Equal' && selected.contains(member.id))
+                              SizedBox(
+                                width: 110,
+                                child: TextFormField(
+                                  key: ValueKey('$mode-${member.id}'),
+                                  initialValue: values[member.id],
+                                  enabled: !locked,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  decoration: InputDecoration(
+                                    labelText: mode == 'Exact'
+                                        ? '₹'
+                                        : mode == 'Percentage'
+                                        ? '%'
+                                        : 'Shares',
+                                  ),
+                                  onChanged: (v) =>
+                                      changed(() => values[member.id] = v),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                ],
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: busy || locked ? null : calculate,
+                  icon: const Icon(Icons.calculate_outlined),
+                  label: Text(busy ? 'Checking…' : 'Calculate & check split'),
+                ),
+                if (preview != null) ...[
+                  const SectionTitle('Final breakdown'),
+                  ..._warnings(preview!['warnings']),
+                  if (duplicateWarning != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        duplicateWarning!,
+                        style: const TextStyle(color: clay),
+                      ),
+                    ),
+                  if (preview!['sourceDifference'] != null)
+                    Text(
+                      'Original ${review['sourceCurrency']} bill difference: ${preview!['sourceDifference']}',
+                      style: const TextStyle(color: clay),
+                    ),
+                  if (preview!['differencePaise'] != 0)
+                    Text(
+                      'Difference from bill total: ${money(preview!['differencePaise'])}',
+                      style: const TextStyle(color: clay),
+                    ),
+                  if (preview!['requiresDifferenceAcknowledgement'] == true)
+                    CheckboxListTile(
+                      value: review['differenceAcknowledged'] == true,
+                      title: const Text(
+                        'Use grand total, split difference proportionally',
+                      ),
+                      onChanged: (v) async {
+                        setState(() {
+                          review['differenceAcknowledged'] = v == true;
+                          review['acknowledgedReviewHash'] = v == true
+                              ? preview!['reviewHash']
+                              : null;
+                        });
+                        await c.receipts.persist(draft);
+                      },
+                    ),
+                  if (review['sourceCurrency'] != 'INR' &&
+                      review['convertedToInr'] == true)
+                    CheckboxListTile(
+                      value:
+                          review['acknowledgedReviewHash'] ==
+                          preview!['reviewHash'],
+                      title: const Text(
+                        'I reviewed and confirm this INR conversion',
+                      ),
+                      onChanged: (v) async {
+                        setState(
+                          () => review['acknowledgedReviewHash'] = v == true
+                              ? preview!['reviewHash']
+                              : null,
+                        );
+                        await c.receipts.persist(draft);
+                      },
+                    ),
+                  if (review['splitByItems'] == true)
+                    ...rows(preview!['people']).map(
+                      (person) => Card(
+                        child: ListTile(
+                          title: Text(g.memberName(person['participantId'])),
+                          subtitle: Text(
+                            'Items ${money(person['itemsPaise'])}${rows(person['charges']).map((part) => '\n${part['kind']}: ${money(part['amountPaise'])}${part['includedInItemPrices'] == true ? ' (included)' : ''}').join()}',
+                          ),
+                          trailing: Text(
+                            money(person['totalPaise']),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...shares().entries.map(
+                      (part) => ListTile(
+                        title: Text(g.memberName(part.key)),
+                        trailing: Text(money(part.value)),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 20),
+                const Text(
+                  'Your confirmation updates the group’s balances. Check every share before saving.',
+                  style: TextStyle(fontSize: 14, color: HisaabColors.muted),
                 ),
               ],
             ),
           ),
-          ..._warnings(
-            object(object(draft['server'])['extraction'])['warnings'],
-          ),
-          if (locked)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'A save is awaiting confirmation. Retry the same save before changing this draft.',
-                style: TextStyle(color: clay),
-              ),
-            ),
-          if (rows(draft['images']).isNotEmpty ||
-              rows(object(draft['server'])['media']).isNotEmpty)
-            OutlinedButton.icon(
-              onPressed: () => setState(() => showImage = !showImage),
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: Text(showImage ? 'Hide bill image' : 'Check bill image'),
-            ),
-          if (showImage)
-            ...rows(draft['images']).map(
-              (image) => SizedBox(
-                height: 250,
-                child: FutureBuilder<Uint8List>(
-                  future: c.receipts.store.image(image['id']),
-                  builder: (context, snapshot) => snapshot.hasData
-                      ? InteractiveViewer(
-                          maxScale: 6,
-                          child: Image.memory(
-                            snapshot.data!,
-                            semanticLabel: 'Bill image, pinch to zoom',
-                          ),
-                        )
-                      : const Center(child: CircularProgressIndicator()),
-                ),
-              ),
-            ),
-          if (showImage && rows(draft['images']).isEmpty)
-            ...rows(object(draft['server'])['media']).map(
-              (image) => SizedBox(
-                height: 250,
-                child: FutureBuilder<Uint8List>(
-                  future: c.receipts.media(draft['id'], image),
-                  builder: (context, snapshot) => snapshot.hasData
-                      ? InteractiveViewer(
-                          maxScale: 6,
-                          child: Image.memory(
-                            snapshot.data!,
-                            semanticLabel: 'Bill image, pinch to zoom',
-                          ),
-                        )
-                      : Center(
-                          child: Text(
-                            snapshot.hasError
-                                ? '${snapshot.error}'
-                                : 'Loading private image…',
-                          ),
-                        ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          TextFormField(
-            initialValue: review['merchant'] ?? '',
-            maxLength: 200,
-            enabled: !locked,
-            decoration: const InputDecoration(
-              labelText: 'Merchant / description',
-            ),
-            onChanged: (v) => changed(() => review['merchant'] = v),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  initialValue: review['sourceCurrency'] ?? 'INR',
-                  enabled: !locked,
-                  maxLength: 3,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(labelText: 'Bill currency'),
-                  onChanged: (v) =>
-                      changed(() => review['sourceCurrency'] = v.toUpperCase()),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: locked
-                      ? null
-                      : () async {
-                          final selected = await showDatePicker(
-                            context: context,
-                            initialDate:
-                                DateTime.tryParse(review['date'] ?? '') ??
-                                DateTime.now(),
-                            firstDate: DateTime(1900),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 365),
-                            ),
-                          );
-                          if (selected != null) {
-                            changed(() => review['date'] = day(selected));
-                          }
-                        },
-                  icon: const Icon(Icons.calendar_today, size: 17),
-                  label: Text(review['date'] ?? 'Bill date'),
-                ),
-              ),
-            ],
-          ),
-          if (review['sourceCurrency'] != 'INR') ...[
-            const Text(
-              'Foreign bill: Hisaab saves INR only. Convert each item, charge, and total yourself. No exchange rate is applied.',
-              style: TextStyle(color: clay),
-            ),
-            TextFormField(
-              initialValue: review['sourceGrandTotal'] ?? '',
-              enabled: !locked,
-              decoration: const InputDecoration(
-                labelText: 'Original bill total',
-              ),
-              onChanged: (v) => changed(() => review['sourceGrandTotal'] = v),
-            ),
-            TextFormField(
-              initialValue: review['sourceSubtotal'] ?? '',
-              enabled: !locked,
-              decoration: const InputDecoration(
-                labelText: 'Original bill subtotal (optional)',
-              ),
-              onChanged: (v) => changed(
-                () => review['sourceSubtotal'] = v.trim().isEmpty
-                    ? null
-                    : v.trim(),
-              ),
-            ),
-            CheckboxListTile(
-              value: review['convertedToInr'] == true,
-              title: const Text('I entered converted INR amounts'),
-              onChanged: locked
+          _ReceiptFooter(
+            error: error,
+            note: MediaQuery.viewInsetsOf(context).bottom > 0
+                ? null
+                : 'Photos and the reviewed split stay with this expense.',
+            child: FilledButton.icon(
+              onPressed:
+                  busy ||
+                      preview == null ||
+                      (expense == null && payer != g.participant(c.userId))
                   ? null
-                  : (v) => changed(() => review['convertedToInr'] = v == true),
-            ),
-          ],
-          const SizedBox(height: 12),
-          _amountField(
-            'Bill subtotal (INR)',
-            'subtotalPaise',
-            optional: true,
-            locked: locked,
-          ),
-          const SizedBox(height: 12),
-          _amountField('Grand total (INR)', 'grandTotalPaise', locked: locked),
-          const SectionTitle('Items'),
-          _ReceiptAllocationSummary(
-            items: items,
-            splitByItems: review['splitByItems'] == true,
-          ),
-          const SizedBox(height: 12),
-          if (items.isEmpty)
-            const Text(
-              'No item breakdown yet. Add items or split the grand total.',
-            ),
-          ...items.asMap().entries.map((entry) {
-            final item = entry.value;
-            final low =
-                item['confidence'] != null && (item['confidence'] as num) < .8;
-            final assigned = (item['assigneeIds'] as List? ?? [])
-                .cast<String>();
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: low ? HisaabColors.peach : HisaabColors.mint,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        low
-                            ? Icons.warning_amber_rounded
-                            : Icons.check_circle_outline,
-                        color: low
-                            ? HisaabColors.warning
-                            : HisaabColors.positive,
-                      ),
-                    ),
-                    title: Text('${item['name']} × ${item['quantity']}'),
-                    subtitle: Text(
-                      '${money(item['lineTotalPaise'] ?? 0)}${low ? ' · Check this reading' : ''}${item['transliteration'] == null ? '' : '\n${item['transliteration']}'}',
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Edit item',
-                      onPressed: locked ? null : () => editItem(entry.key),
-                      icon: const Icon(Icons.edit_outlined),
-                    ),
-                  ),
-                  if (review['splitByItems'] == true) ...[
-                    const Divider(height: 1),
-                    ListTile(
-                      tileColor: assigned.isEmpty && item['ignored'] != true
-                          ? HisaabColors.peach
-                          : HisaabColors.surface,
-                      minVerticalPadding: 12,
-                      title: Text(
-                        item['ignored'] == true
-                            ? 'Ignored zero-price item'
-                            : assigned.isEmpty
-                            ? 'Unassigned — choose who shared this'
-                            : assigned.map(g.memberName).join(', '),
-                        style: TextStyle(
-                          color: assigned.isEmpty && item['ignored'] != true
-                              ? clay
-                              : null,
-                        ),
-                      ),
-                      trailing: const Icon(Icons.people_outline),
-                      onTap: locked ? null : () => assign(entry.key),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
-          TextButton.icon(
-            onPressed: locked || items.length >= 150
-                ? null
-                : () => editItem(null),
-            icon: const Icon(Icons.add),
-            label: const Text('Add item'),
-          ),
-          const SectionTitle('Tax, charges & discounts'),
-          ...charges.asMap().entries.map(
-            (entry) => Card(
-              child: ListTile(
-                title: Text(
-                  '${entry.value['name']} · ${money(entry.value['amountPaise'] ?? 0)}',
-                ),
-                subtitle: Text(
-                  '${entry.value['confidence'] != null && (entry.value['confidence'] as num) < .8 ? 'Check this reading · ' : ''}${entry.value['includedInItemPrices'] == true
-                      ? 'Already included in item prices'
-                      : object(entry.value['weights']).isEmpty
-                      ? 'Proportional to each person’s items'
-                      : 'Custom allocation weights'}',
-                ),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: locked ? null : () => editCharge(entry.key),
+                  : save,
+              icon: const Icon(Icons.check_rounded),
+              label: Text(
+                locked ? 'Retry confirmed save' : 'Confirm & save expense',
               ),
             ),
-          ),
-          TextButton.icon(
-            onPressed: locked || charges.length >= 20
-                ? null
-                : () => editCharge(null),
-            icon: const Icon(Icons.add),
-            label: const Text('Add tax / charge / discount'),
-          ),
-          const SectionTitle('Who paid and how to split'),
-          DropdownButtonFormField<String>(
-            initialValue: payer,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Paid by'),
-            items: g.members
-                .where((m) => !m.left && !m.deleted)
-                .map(
-                  (m) => DropdownMenuItem(
-                    value: m.id,
-                    child: Text(m.userId == c.userId ? 'You' : m.name),
-                  ),
-                )
-                .toList(),
-            onChanged: locked ? null : (v) => changed(() => payer = v),
-          ),
-          if (expense == null && payer != g.participant(c.userId))
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'The selected payer must confirm an expense with a receipt from their own account.',
-                style: TextStyle(color: clay),
-              ),
-            ),
-          const SizedBox(height: 16),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Split total')),
-              ButtonSegment(value: true, label: Text('Split by items')),
-            ],
-            selected: {review['splitByItems'] == true},
-            onSelectionChanged: locked
-                ? null
-                : (s) => changed(() => review['splitByItems'] = s.first),
-          ),
-          if (review['splitByItems'] != true) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: ['Equal', 'Exact', 'Percentage', 'Shares']
-                  .map(
-                    (value) => ChoiceChip(
-                      label: Text(value),
-                      selected: mode == value,
-                      onSelected: locked
-                          ? null
-                          : (_) => changed(() {
-                              mode = value;
-                              for (final id in values.keys) {
-                                values[id] = value == 'Shares' ? '1' : '';
-                              }
-                            }),
-                    ),
-                  )
-                  .toList(),
-            ),
-            ...g.members
-                .where((m) => !m.left && !m.deleted)
-                .map(
-                  (member) => Row(
-                    children: [
-                      Checkbox(
-                        value: selected.contains(member.id),
-                        onChanged: locked
-                            ? null
-                            : (v) => changed(() {
-                                if (v == true) {
-                                  selected.add(member.id);
-                                } else {
-                                  selected.remove(member.id);
-                                }
-                              }),
-                      ),
-                      Expanded(child: Text(member.name)),
-                      if (mode != 'Equal' && selected.contains(member.id))
-                        SizedBox(
-                          width: 110,
-                          child: TextFormField(
-                            key: ValueKey('$mode-${member.id}'),
-                            initialValue: values[member.id],
-                            enabled: !locked,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: mode == 'Exact'
-                                  ? '₹'
-                                  : mode == 'Percentage'
-                                  ? '%'
-                                  : 'Shares',
-                            ),
-                            onChanged: (v) =>
-                                changed(() => values[member.id] = v),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-          ],
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: busy || locked ? null : calculate,
-            icon: const Icon(Icons.calculate_outlined),
-            label: Text(busy ? 'Checking…' : 'Calculate & check split'),
-          ),
-          if (preview != null) ...[
-            const SectionTitle('Final breakdown'),
-            ..._warnings(preview!['warnings']),
-            if (duplicateWarning != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  duplicateWarning!,
-                  style: const TextStyle(color: clay),
-                ),
-              ),
-            if (preview!['sourceDifference'] != null)
-              Text(
-                'Original ${review['sourceCurrency']} bill difference: ${preview!['sourceDifference']}',
-                style: const TextStyle(color: clay),
-              ),
-            if (preview!['differencePaise'] != 0)
-              Text(
-                'Difference from bill total: ${money(preview!['differencePaise'])}',
-                style: const TextStyle(color: clay),
-              ),
-            if (preview!['requiresDifferenceAcknowledgement'] == true)
-              CheckboxListTile(
-                value: review['differenceAcknowledged'] == true,
-                title: const Text(
-                  'Use grand total, split difference proportionally',
-                ),
-                onChanged: (v) async {
-                  setState(() {
-                    review['differenceAcknowledged'] = v == true;
-                    review['acknowledgedReviewHash'] = v == true
-                        ? preview!['reviewHash']
-                        : null;
-                  });
-                  await c.receipts.persist(draft);
-                },
-              ),
-            if (review['sourceCurrency'] != 'INR' &&
-                review['convertedToInr'] == true)
-              CheckboxListTile(
-                value:
-                    review['acknowledgedReviewHash'] == preview!['reviewHash'],
-                title: const Text('I reviewed and confirm this INR conversion'),
-                onChanged: (v) async {
-                  setState(
-                    () => review['acknowledgedReviewHash'] = v == true
-                        ? preview!['reviewHash']
-                        : null,
-                  );
-                  await c.receipts.persist(draft);
-                },
-              ),
-            if (review['splitByItems'] == true)
-              ...rows(preview!['people']).map(
-                (person) => Card(
-                  child: ListTile(
-                    title: Text(g.memberName(person['participantId'])),
-                    subtitle: Text(
-                      'Items ${money(person['itemsPaise'])}${rows(person['charges']).map((part) => '\n${part['kind']}: ${money(part['amountPaise'])}${part['includedInItemPrices'] == true ? ' (included)' : ''}').join()}',
-                    ),
-                    trailing: Text(
-                      money(person['totalPaise']),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              )
-            else
-              ...shares().entries.map(
-                (part) => ListTile(
-                  title: Text(g.memberName(part.key)),
-                  trailing: Text(money(part.value)),
-                ),
-              ),
-          ],
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Text(error!, style: const TextStyle(color: clay)),
-            ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed:
-                busy ||
-                    preview == null ||
-                    (expense == null && payer != g.participant(c.userId))
-                ? null
-                : save,
-            icon: const Icon(Icons.check),
-            label: Text(
-              locked ? 'Retry confirmed save' : 'Confirm & save expense',
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'This confirmation updates the group’s balances. Photos and the reviewed breakdown stay with the expense.',
-            style: TextStyle(fontSize: 14, color: HisaabColors.muted),
           ),
         ],
       ),
@@ -1527,10 +1741,12 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
     final items = rows(review['items']);
     final item = items[index];
     final ids = (item['assigneeIds'] as List? ?? []).cast<String>().toSet();
-    final saved = await showDialog<bool>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
+        builder: (context, update) => _ReceiptEditorSheet(
           title: Text('Who shared ${item['name']}?'),
           content: SizedBox(
             width: double.maxFinite,
@@ -1542,6 +1758,13 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                     .map(
                       (m) => CheckboxListTile(
                         value: ids.contains(m.id),
+                        secondary: CircleAvatar(
+                          backgroundColor: HisaabColors.lilac,
+                          foregroundColor: HisaabColors.primary,
+                          child: Text(
+                            m.name.characters.firstOrNull?.toUpperCase() ?? '?',
+                          ),
+                        ),
                         title: Text(m.name),
                         onChanged: (v) => update(() {
                           if (v == true) {
@@ -1552,6 +1775,20 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                         }),
                       ),
                     ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: HisaabColors.mint,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    ids.isEmpty
+                        ? 'Choose who shared this item.'
+                        : '${money(item['lineTotalPaise'] ?? 0)} shared among ${ids.length} ${ids.length == 1 ? 'person' : 'people'}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1602,10 +1839,21 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
           text: prior['transliteration'] ?? '',
         );
     var ignored = prior['ignored'] == true;
-    final result = await showDialog<Json>(
+    final result = await showModalBottomSheet<Json>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
+        builder: (context, update) => _ReceiptEditorSheet(
+          controllers: [
+            name,
+            quantity,
+            price,
+            total,
+            sourcePrice,
+            sourceTotal,
+            transliteration,
+          ],
           title: Text(index == null ? 'Add item' : 'Edit item'),
           content: SingleChildScrollView(
             child: Column(
@@ -1632,6 +1880,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                   ),
                   decoration: const InputDecoration(labelText: 'Quantity'),
                 ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: price,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -1639,8 +1888,10 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                   ),
                   decoration: const InputDecoration(
                     labelText: 'Unit price (INR)',
+                    prefixText: '₹ ',
                   ),
                 ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: total,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -1648,6 +1899,8 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                   ),
                   decoration: const InputDecoration(
                     labelText: 'Line total (INR)',
+                    prefixText: '₹ ',
+                    fillColor: HisaabColors.lilac,
                   ),
                 ),
                 if (review['sourceCurrency'] != 'INR') ...[
@@ -1736,17 +1989,6 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
         ),
       ),
     );
-    for (final input in [
-      name,
-      quantity,
-      price,
-      total,
-      transliteration,
-      sourcePrice,
-      sourceTotal,
-    ]) {
-      input.dispose();
-    }
     if (result != null) {
       changed(() {
         if (result['delete'] == true) {
@@ -1786,11 +2028,14 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
           text: '${object(prior['weights'])[m.id] ?? 1}',
         ),
     };
-    final result = await showDialog<Json>(
+    final result = await showModalBottomSheet<Json>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: const Text('Tax or charge'),
+        builder: (context, update) => _ReceiptEditorSheet(
+          controllers: [name, amount, sourceAmount, ...weights.values],
+          title: const Text('Add a charge'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1801,8 +2046,10 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                     labelText: 'Name (CGST, tip, discount…)',
                   ),
                 ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: kind,
+                  decoration: const InputDecoration(labelText: 'Type'),
                   items:
                       [
                             'Tax',
@@ -1825,6 +2072,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                     if (kind == 'Discount') negative = true;
                   }),
                 ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: amount,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -1854,11 +2102,30 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                   title: const Text('Already included in item prices'),
                   onChanged: (v) => update(() => included = v == true),
                 ),
-                SwitchListTile(
-                  value: custom,
-                  title: const Text('Override proportional allocation'),
-                  onChanged: (v) => update(() => custom = v),
+                const SizedBox(height: 16),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Split this charge',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Proportional')),
+                    ButtonSegment(value: true, label: Text('Custom')),
+                  ],
+                  selected: {custom},
+                  onSelectionChanged: (values) =>
+                      update(() => custom = values.first),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Proportional charges follow each person’s share of the items.',
+                  style: TextStyle(fontSize: 13, color: HisaabColors.muted),
+                ),
+                const SizedBox(height: 12),
                 if (custom)
                   ...weights.entries.map(
                     (entry) => TextField(
@@ -1930,12 +2197,6 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
         ),
       ),
     );
-    name.dispose();
-    amount.dispose();
-    sourceAmount.dispose();
-    for (final input in weights.values) {
-      input.dispose();
-    }
     if (result != null) {
       changed(() {
         if (result['delete'] == true) {

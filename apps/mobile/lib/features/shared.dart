@@ -110,7 +110,11 @@ class SectionTitle extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         ?trailing,
@@ -139,7 +143,7 @@ class EmptyCard extends StatelessWidget {
       child: Column(
         children: [
           if (illustrationAsset case final asset?)
-            EditorialArtwork(asset: asset, height: 100)
+            EditorialArtwork(asset: asset, height: 160)
           else
             ExcludeSemantics(
               child: Container(
@@ -174,7 +178,7 @@ class PageBody extends StatelessWidget {
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 640),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         physics: const AlwaysScrollableScrollPhysics(),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: children,
@@ -201,22 +205,19 @@ class EditorialArtwork extends StatelessWidget {
   Widget build(BuildContext context) {
     final artwork = ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(22),
-      child: ColoredBox(
-        color: HisaabColors.illustrationBackground,
-        child: LayoutBuilder(
-          builder: (context, constraints) => Image.asset(
-            asset,
-            width: double.infinity,
-            height: height,
-            fit: fit,
-            excludeFromSemantics: true,
-            cacheWidth: constraints.hasBoundedWidth
-                ? (constraints.maxWidth *
-                          MediaQuery.devicePixelRatioOf(context))
-                      .round()
-                      .clamp(1, 1536)
-                : 1024,
-          ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Image.asset(
+          asset,
+          width: double.infinity,
+          height: height,
+          fit: fit,
+          filterQuality: FilterQuality.medium,
+          excludeFromSemantics: true,
+          cacheWidth: constraints.hasBoundedWidth
+              ? (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
+                    .round()
+                    .clamp(1, 1536)
+              : 1024,
         ),
       ),
     );
@@ -235,12 +236,10 @@ class GroupArtwork extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox.square(
     dimension: size,
     child: EditorialArtwork(
-      asset: type == 'Home'
-          ? 'assets/illustrations/shared-home.png'
-          : 'assets/illustrations/moments.png',
+      asset: HisaabArt.forGroup(type),
       height: size,
       borderRadius: BorderRadius.circular(16),
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
     ),
   );
 }

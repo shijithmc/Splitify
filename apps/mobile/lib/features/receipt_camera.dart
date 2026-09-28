@@ -184,26 +184,32 @@ class _ReceiptCameraPageState extends State<ReceiptCameraPage>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Photograph your bill')),
+    backgroundColor: HisaabColors.ink,
+    appBar: AppBar(
+      title: const Text('Photograph your bill'),
+      backgroundColor: HisaabColors.ink,
+      foregroundColor: Colors.white,
+      titleTextStyle: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(color: Colors.white),
+    ),
     body: SafeArea(
       child: _ReceiptImageLayout(
         guidance: Container(
           margin: const EdgeInsets.fromLTRB(20, 8, 20, 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: HisaabColors.lilac,
+            color: Colors.white.withValues(alpha: .1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Row(
             children: [
-              Icon(
-                Icons.document_scanner_outlined,
-                color: HisaabColors.primary,
-              ),
+              Icon(Icons.document_scanner_outlined, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Flatten the bill · Avoid glare · Keep every edge in frame',
+                  style: TextStyle(color: Colors.white),
                 ),
               ),
             ],
@@ -220,17 +226,23 @@ class _ReceiptCameraPageState extends State<ReceiptCameraPage>
                         const Icon(
                           Icons.no_photography_outlined,
                           size: 48,
-                          color: HisaabColors.muted,
+                          color: Colors.white70,
                         ),
                         const SizedBox(height: 16),
-                        Text(error!, textAlign: TextAlign.center),
+                        Text(
+                          error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       ],
                     ),
                   ),
                 ),
               )
             : camera?.value.isInitialized != true
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              )
             : Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: ClipRRect(
@@ -258,10 +270,16 @@ class _ReceiptCameraPageState extends State<ReceiptCameraPage>
                     ? 'Move the bill onto a contrasting surface.'
                     : 'Edges found. Check the crop after taking the photo.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
               ),
               const SizedBox(height: 14),
               FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: HisaabColors.ink,
+                  disabledBackgroundColor: Colors.white24,
+                  disabledForegroundColor: Colors.white54,
+                ),
                 onPressed: taking || camera?.value.isInitialized != true
                     ? null
                     : capture,
@@ -269,6 +287,7 @@ class _ReceiptCameraPageState extends State<ReceiptCameraPage>
                 label: Text(taking ? 'Preparing photo…' : 'Take photo'),
               ),
               TextButton(
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
                 onPressed: () => Navigator.pop(context, 'gallery'),
                 child: const Text('Choose from gallery instead'),
               ),
@@ -342,7 +361,7 @@ class _ReceiptCropPageState extends State<ReceiptCropPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Check the crop')),
+    appBar: AppBar(title: const Text('Keep this photo?')),
     body: SafeArea(
       child: _ReceiptImageLayout(
         guidance: Container(
@@ -352,8 +371,16 @@ class _ReceiptCropPageState extends State<ReceiptCropPage> {
             color: HisaabColors.mint,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Text(
-            'Check that every item and the total are readable. Keep the full photo if any text was cut off.',
+          child: const Row(
+            children: [
+              Icon(Icons.zoom_in_rounded, color: HisaabColors.positive),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Pinch to check the details. Make sure every item and the total are readable.',
+                ),
+              ),
+            ],
           ),
         ),
         preview: preparing

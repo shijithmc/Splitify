@@ -38,159 +38,116 @@ class SettingsPage extends StatelessWidget {
     final displayName = name == null || name.isEmpty ? 'Your account' : name;
     return PageBody(
       children: [
-        Card(
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              radius: 24,
-              backgroundColor: HisaabColors.mint,
-              foregroundColor: HisaabColors.ink,
+        Text('Your space', style: Theme.of(context).textTheme.headlineLarge),
+        const SizedBox(height: 6),
+        const Text(
+          'Your account, your preferences.',
+          style: TextStyle(color: HisaabColors.muted),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: HisaabColors.lilac,
+              foregroundColor: HisaabColors.primary,
               child: Text(
                 displayName.characters.first.toUpperCase(),
                 style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            title: Text(
-              displayName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    c.demo
+                        ? 'Local demo · no real account'
+                        : c.user['email'] ?? 'Personal account',
+                    style: const TextStyle(color: HisaabColors.muted),
+                  ),
+                ],
+              ),
             ),
-            subtitle: Text(
-              c.demo
-                  ? 'Local demo · no real account'
-                  : c.user['email'] ?? 'Private account',
-            ),
-          ),
+          ],
         ),
-        const SizedBox(height: 12),
-        Card(
-          child: _AccountRow(
-            icon: Icons.block_outlined,
-            title: _planLabel(c),
-            subtitle: c.adFree ? 'View your plan' : 'Explore ad-free',
-            onTap: () => openPage(context, c, PremiumPage(controller: c)),
-          ),
-        ),
-        const SectionTitle('Notifications'),
+        const SizedBox(height: 24),
         Card(
           child: Column(
             children: [
-              for (final entry in {
-                'expenses': 'Expense updates',
-                'payments': 'Payment updates',
-                'invites': 'Invitations',
-                'receiptDetails': 'Receipt details on lock screen',
-              }.entries)
-                SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 0,
-                  ),
-                  title: Text(entry.value),
-                  subtitle: entry.key == 'receiptDetails'
-                      ? const Text('Include item names and amounts.')
-                      : null,
-                  value:
-                      c.preferences[entry.key] ??
-                      (entry.key != 'receiptDetails'),
-                  onChanged: c.offline
-                      ? null
-                      : (enabled) => act(context, () async {
-                          await c.request('PATCH', '/me/preferences', {
-                            ...c.preferences,
-                            entry.key: enabled,
-                          });
-                          await c.refresh();
-                        }),
-                ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
               _AccountRow(
-                icon: Icons.notifications_outlined,
-                title: 'Enable push on this device',
-                subtitle: 'Choose delivery in device settings.',
-                onTap: () => act(context, () async {
-                  await c.push.enable(c.repository!, () => c.refresh());
-                  if (context.mounted) {
-                    message(context, 'Device notification settings updated.');
-                  }
-                }),
+                icon: Icons.notifications_rounded,
+                title: 'Notifications',
+                subtitle: 'Updates that matter to you',
+                onTap: () => openPage(
+                  context,
+                  c,
+                  NotificationSettingsPage(controller: c),
+                ),
+              ),
+              const _AccountDivider(),
+              _AccountRow(
+                icon: Icons.link_rounded,
+                color: HisaabColors.mint,
+                title: 'Linked sign-in methods',
+                subtitle: 'One account. More ways in.',
+                onTap: () => linkIdentity(context),
+              ),
+              const _AccountDivider(),
+              _AccountRow(
+                icon: Icons.auto_awesome_rounded,
+                color: HisaabColors.peach,
+                title: 'Ad-free plan',
+                subtitle: _planLabel(c),
+                onTap: () => openPage(context, c, PremiumPage(controller: c)),
+              ),
+              const _AccountDivider(),
+              _AccountRow(
+                icon: Icons.shield_rounded,
+                title: 'Privacy & your data',
+                subtitle: 'Your information, your choices',
+                onTap: () =>
+                    openPage(context, c, _PrivacySettingsPage(settings: this)),
               ),
             ],
           ),
         ),
-        const SectionTitle('Account & purchases'),
+        const SectionTitle('More'),
         Card(
           child: Column(
             children: [
               _AccountRow(
-                icon: Icons.link_rounded,
-                title: 'Link a sign-in method',
-                subtitle: 'One account across your devices.',
-                onTap: () => linkIdentity(context),
-              ),
-              _AccountRow(
-                icon: Icons.manage_accounts_outlined,
+                icon: Icons.tune_rounded,
+                color: HisaabColors.surface,
                 title: 'Manage subscription',
-                subtitle: 'Review renewal in your store.',
+                subtitle: 'View or change your plan',
                 onTap: () => openLink(context, AppConfig.subscriptionUrl),
               ),
+              const _AccountDivider(),
               _AccountRow(
                 icon: Icons.logout_rounded,
+                color: HisaabColors.peach,
                 title: c.demo ? 'Leave demo' : 'Sign out',
+                subtitle: 'Sign out from this device',
                 onTap: () => act(context, c.logout),
               ),
             ],
           ),
         ),
-        const SectionTitle('Privacy & your data'),
-        Card(
-          child: Column(
-            children: [
-              _AccountRow(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy & ad choices',
-                onTap: () => act(context, () async {
-                  if (!AppConfig.adsEnabled) {
-                    message(context, 'Ads are disabled in this build.');
-                    return;
-                  }
-                  await ConsentForm.showPrivacyOptionsForm((error) {
-                    if (error != null && context.mounted) {
-                      message(context, error.message);
-                    }
-                  });
-                }),
-              ),
-              _AccountRow(
-                icon: Icons.policy_outlined,
-                title: 'Privacy policy',
-                onTap: () => openLink(context, AppConfig.privacyUrl),
-              ),
-              _AccountRow(
-                icon: Icons.description_outlined,
-                title: 'Terms of use',
-                onTap: () => openLink(context, AppConfig.termsUrl),
-              ),
-              _AccountRow(
-                icon: Icons.delete_outline_rounded,
-                title: c.demo ? 'Reset demo data' : 'Delete account',
-                destructive: true,
-                onTap: () => deleteAccount(context),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         const Text(
           'Hisaab · INR · 1.0.0',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.8,
-            color: HisaabColors.muted,
-          ),
+          style: TextStyle(fontSize: 12, color: HisaabColors.muted),
         ),
       ],
     );
@@ -205,7 +162,7 @@ class SettingsPage extends StatelessWidget {
     final repo = c.repository;
     final provider = await _chooseProvider(
       context,
-      title: 'Link another sign-in',
+      title: 'One account. More ways in.',
       description:
           'Choose the method you want to add. We’ll first confirm your current account, then verify the new method.',
       action: 'Link',
@@ -225,11 +182,11 @@ class SettingsPage extends StatelessWidget {
       if (repo is! ApiRepository ||
           c.userId != account ||
           !identical(c.repository, repo)) {
-        throw ApiFailure('Account changed. Start linking again from Settings.');
+        throw ApiFailure('Account changed. Start linking again from Account.');
       }
       await _reauthenticate(context, repo, currentProvider, account);
       if (c.userId != account || !identical(c.repository, repo)) {
-        throw ApiFailure('Account changed. Start linking again from Settings.');
+        throw ApiFailure('Account changed. Start linking again from Account.');
       }
       if (!context.mounted) return;
       if (provider == 'phone') {
@@ -238,7 +195,7 @@ class SettingsPage extends StatelessWidget {
         final proof = await c.identity.credential(repo, provider);
         if (c.userId != account || !identical(c.repository, repo)) {
           throw ApiFailure(
-            'Account changed. Start linking again from Settings.',
+            'Account changed. Start linking again from Account.',
           );
         }
         await repo.request('POST', '/auth/link', proof);
@@ -285,42 +242,70 @@ class SettingsPage extends StatelessWidget {
       : c.identity.reauthenticate(repo, provider, account);
 
   Future<void> deleteAccount(BuildContext context) async {
-    final confirmDelete = await showDialog<bool>(
+    final confirmDelete = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(c.demo ? 'Reset the demo?' : 'Delete your account?'),
-        content: SingleChildScrollView(
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const Center(
+                child: CircleAvatar(
+                  radius: 32,
+                  backgroundColor: HisaabColors.peach,
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    color: HisaabColors.warning,
+                    size: 30,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                c.demo ? 'Reset the demo?' : 'Delete your account?',
+                textAlign: TextAlign.center,
+                style: Theme.of(ctx).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 14),
               Text(
                 c.demo
                     ? 'This removes this device’s demo expenses and returns to the welcome screen.'
                     : 'Your personal account data will be removed. Shared financial history remains for other members under “Deleted user”, and outstanding balances remain recorded.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(height: 1.5),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Deleting an account does not cancel a store subscription.',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: HisaabColors.muted, height: 1.5),
               ),
               TextButton(
                 onPressed: () => openLink(ctx, AppConfig.subscriptionUrl),
                 child: const Text('Manage store subscription'),
               ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Keep account'),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  foregroundColor: HisaabColors.warning,
+                  backgroundColor: HisaabColors.peach,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(c.demo ? 'Reset demo' : 'Delete account'),
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep account'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(c.demo ? 'Reset demo' : 'Delete account'),
-          ),
-        ],
       ),
     );
     if (confirmDelete != true || !context.mounted) return;
@@ -348,14 +333,237 @@ class SettingsPage extends StatelessWidget {
         );
       }
       if (c.userId != account || !identical(c.repository, repo)) {
-        throw ApiFailure(
-          'Account changed. Start deletion again from Settings.',
-        );
+        throw ApiFailure('Account changed. Start deletion again from Account.');
       }
       await c.request('DELETE', '/me', {'confirm': true});
       await c.logout(deleted: true);
     });
   }
+}
+
+class NotificationSettingsPage extends StatelessWidget {
+  final AppController controller;
+  const NotificationSettingsPage({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: controller,
+    builder: (context, _) => Scaffold(
+      appBar: AppBar(title: const Text('Notifications')),
+      body: PageBody(
+        children: [
+          const _SettingsHeading(
+            title: 'Stay in the loop',
+            subtitle: 'Get notified about what matters.',
+            icon: Icons.notifications_active_rounded,
+          ),
+          const SizedBox(height: 24),
+          Card(
+            child: Column(
+              children: [
+                for (final entry in const [
+                  (
+                    'expenses',
+                    'Expense updates',
+                    'When shared expenses change',
+                    Icons.groups_rounded,
+                    HisaabColors.mint,
+                  ),
+                  (
+                    'payments',
+                    'Payment updates',
+                    'When someone records a payment',
+                    Icons.arrow_forward_rounded,
+                    HisaabColors.peach,
+                  ),
+                  (
+                    'invites',
+                    'Invitations',
+                    'When you’re invited to a group',
+                    Icons.person_add_alt_1_rounded,
+                    HisaabColors.lilac,
+                  ),
+                  (
+                    'receiptDetails',
+                    'Receipt details on lock screen',
+                    'Include item names and amounts.',
+                    Icons.lock_outline_rounded,
+                    HisaabColors.surface,
+                  ),
+                ]) ...[
+                  if (entry.$1 != 'expenses') const _AccountDivider(),
+                  SwitchListTile.adaptive(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    secondary: MediaQuery.textScalerOf(context).scale(16) > 24
+                        ? null
+                        : _AccountIcon(entry.$4, color: entry.$5),
+                    title: Text(entry.$2),
+                    subtitle: Text(entry.$3),
+                    value:
+                        controller.preferences[entry.$1] ??
+                        (entry.$1 != 'receiptDetails'),
+                    onChanged: controller.offline
+                        ? null
+                        : (enabled) => act(context, () async {
+                            await controller.request(
+                              'PATCH',
+                              '/me/preferences',
+                              {...controller.preferences, entry.$1: enabled},
+                            );
+                            await controller.refresh();
+                          }),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: _AccountRow(
+              icon: Icons.tune_rounded,
+              color: HisaabColors.surface,
+              title: 'Enable push on this device',
+              subtitle: 'Choose delivery in device settings.',
+              onTap: () => act(context, () async {
+                if (controller.demo) {
+                  message(context, 'Sign in to enable device notifications.');
+                  return;
+                }
+                await controller.push.enable(
+                  controller.repository!,
+                  () => controller.refresh(),
+                );
+                if (context.mounted) {
+                  message(context, 'Device notification settings updated.');
+                }
+              }),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PrivacySettingsPage extends StatelessWidget {
+  final SettingsPage settings;
+  const _PrivacySettingsPage({required this.settings});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Privacy & your data')),
+    body: PageBody(
+      children: [
+        const _SettingsHeading(
+          title: 'You’re in control',
+          subtitle: 'A little clarity about your information.',
+          icon: Icons.shield_rounded,
+        ),
+        const SizedBox(height: 24),
+        Card(
+          child: Column(
+            children: [
+              _AccountRow(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy & ad choices',
+                onTap: () => act(context, () async {
+                  if (!AppConfig.adsEnabled) {
+                    message(context, 'Ads are disabled in this build.');
+                    return;
+                  }
+                  await ConsentForm.showPrivacyOptionsForm((error) {
+                    if (error != null && context.mounted) {
+                      message(context, error.message);
+                    }
+                  });
+                }),
+              ),
+              const _AccountDivider(),
+              _AccountRow(
+                icon: Icons.policy_outlined,
+                color: HisaabColors.mint,
+                title: 'Privacy policy',
+                onTap: () => openLink(context, AppConfig.privacyUrl),
+              ),
+              const _AccountDivider(),
+              _AccountRow(
+                icon: Icons.description_outlined,
+                color: HisaabColors.mint,
+                title: 'Terms of use',
+                onTap: () => openLink(context, AppConfig.termsUrl),
+              ),
+            ],
+          ),
+        ),
+        const SectionTitle('Account data'),
+        Card(
+          child: _AccountRow(
+            icon: Icons.delete_outline_rounded,
+            title: settings.c.demo ? 'Reset demo data' : 'Delete account',
+            subtitle: settings.c.demo
+                ? 'Start your demo again'
+                : 'Review what happens before you decide',
+            destructive: true,
+            onTap: () => settings.deleteAccount(context),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SettingsHeading extends StatelessWidget {
+  final String title, subtitle;
+  final IconData icon;
+  const _SettingsHeading({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: const TextStyle(color: HisaabColors.muted, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Transform.rotate(
+          angle: -.12,
+          child: ExcludeSemantics(
+            child: CircleAvatar(
+              radius: 26,
+              backgroundColor: HisaabColors.lilac,
+              child: Icon(icon, color: HisaabColors.primary, size: 28),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AccountDivider extends StatelessWidget {
+  const _AccountDivider();
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, indent: 66, endIndent: 16);
 }
 
 class PremiumPage extends StatefulWidget {
@@ -401,46 +609,17 @@ class _PremiumPageState extends State<PremiumPage> {
       appBar: AppBar(title: const Text('Ad-free plan')),
       body: PageBody(
         children: [
+          Text(
+            'A little more calm',
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
+          const SizedBox(height: 8),
           const Text(
-            'All the essentials stay free.',
+            'Same Hisaab you love. No ads.',
             style: TextStyle(color: HisaabColors.muted, height: 1.5),
           ),
-          const SizedBox(height: 22),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: HisaabColors.lilac,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ExcludeSemantics(child: _PremiumIllustration()),
-                SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Good company.\nZero interruptions.',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -.6,
-                          height: 1.15,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Text(
-                        'Your space, without banner ads.',
-                        style: TextStyle(fontSize: 14, height: 1.5),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 20),
+          const EditorialArtwork(asset: HisaabArt.together, height: 180),
           if (c.adFree) ...[
             const SizedBox(height: 18),
             _AccountNotice(
@@ -456,11 +635,7 @@ class _PremiumPageState extends State<PremiumPage> {
           ],
           const SizedBox(height: 20),
           Card(
-            color: HisaabColors.mint,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: HisaabColors.primary, width: 1.5),
-            ),
+            color: HisaabColors.lilac,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -472,7 +647,7 @@ class _PremiumPageState extends State<PremiumPage> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'For an ad-free experience',
+                    'All the essentials stay free.',
                     style: TextStyle(color: HisaabColors.muted),
                   ),
                   const SizedBox(height: 20),
@@ -722,15 +897,20 @@ String _planLabel(AppController c) {
 class _AccountIcon extends StatelessWidget {
   final IconData icon;
   final bool destructive;
-  const _AccountIcon(this.icon, {this.destructive = false});
+  final Color color;
+  const _AccountIcon(
+    this.icon, {
+    this.destructive = false,
+    this.color = HisaabColors.lilac,
+  });
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
     child: Container(
-      width: 32,
-      height: 32,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
-        color: destructive ? HisaabColors.peach : HisaabColors.surface,
-        borderRadius: BorderRadius.circular(8),
+        color: destructive ? HisaabColors.peach : color,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(
         icon,
@@ -747,17 +927,19 @@ class _AccountRow extends StatelessWidget {
   final String? subtitle;
   final VoidCallback onTap;
   final bool destructive;
+  final Color color;
   const _AccountRow({
     required this.icon,
     required this.title,
     required this.onTap,
     this.subtitle,
     this.destructive = false,
+    this.color = HisaabColors.lilac,
   });
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    leading: _AccountIcon(icon, destructive: destructive),
+    leading: _AccountIcon(icon, destructive: destructive, color: color),
     title: Text(title, style: TextStyle(color: destructive ? clay : null)),
     subtitle: subtitle == null ? null : Text(subtitle!),
     trailing: const ExcludeSemantics(
@@ -834,27 +1016,6 @@ class _PlanBenefit extends StatelessWidget {
   );
 }
 
-class _PremiumIllustration extends StatelessWidget {
-  const _PremiumIllustration();
-  @override
-  Widget build(BuildContext context) => Transform.rotate(
-    angle: -.12,
-    child: Container(
-      width: 54,
-      height: 54,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6EDC1),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Icon(
-        Icons.star_outline_rounded,
-        color: Color(0xFF8A732B),
-        size: 32,
-      ),
-    ),
-  );
-}
-
 Future<String?> _chooseProvider(
   BuildContext context, {
   required String title,
@@ -872,34 +1033,51 @@ Future<String?> _chooseProvider(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(alignment: Alignment.centerLeft, child: _AccountIcon(icon)),
-          const SizedBox(height: 18),
+          Center(
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: HisaabColors.lilac,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 44, color: HisaabColors.primary),
+            ),
+          ),
+          const SizedBox(height: 22),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-            ),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 12),
           Text(
             description,
+            textAlign: TextAlign.center,
             style: const TextStyle(height: 1.5, color: HisaabColors.muted),
           ),
           const SizedBox(height: 24),
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context, 'google'),
-            child: Text('$action Google'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, 'apple'),
             icon: const Icon(Icons.apple_rounded),
             label: Text('$action Apple'),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
+            onPressed: () => Navigator.pop(context, 'google'),
+            icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+            label: Text('$action Google'),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(
+              backgroundColor: HisaabColors.lilac,
+              foregroundColor: HisaabColors.primary,
+            ),
             onPressed: () => Navigator.pop(context, 'phone'),
             icon: const Icon(Icons.phone_outlined),
             label: Text('$action phone'),

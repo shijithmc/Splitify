@@ -96,6 +96,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('scans left'), findsNothing);
       await tester.scrollUntilVisible(
+        find.text('Notifications'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Notifications'));
+      await tester.pumpAndSettle();
+      expect(find.text('Stay in the loop'), findsOneWidget);
+      await tester.scrollUntilVisible(
         find.text('Receipt details on lock screen'),
         250,
         scrollable: find.byType(Scrollable).first,
@@ -104,6 +112,18 @@ void main() {
         find.widgetWithText(SwitchListTile, 'Receipt details on lock screen'),
       );
       expect(receiptPreference.value, isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Privacy & your data'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Privacy & your data').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Privacy & your data'));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Reset demo data'),
         250,
@@ -115,6 +135,59 @@ void main() {
       controller.dispose();
     },
   );
+
+  testWidgets('account preferences and deletion choices are reachable', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController();
+    await controller.startDemo();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: HisaabTheme.light,
+        home: Scaffold(body: SettingsPage(controller: controller)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SwitchListTile), findsNothing);
+    await tester.tap(find.text('Notifications'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Expense updates'));
+    await tester.pumpAndSettle();
+    expect(controller.preferences['expenses'], isFalse);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Notifications'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.widgetWithText(SwitchListTile, 'Expense updates'),
+          )
+          .value,
+      isFalse,
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Privacy & your data'));
+    await tester.tap(find.text('Privacy & your data'));
+    await tester.pumpAndSettle();
+    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Terms of use'), findsOneWidget);
+    await tester.ensureVisible(find.text('Reset demo data'));
+    await tester.tap(find.text('Reset demo data'));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage store subscription'), findsOneWidget);
+    await tester.ensureVisible(find.text('Keep account'));
+    await tester.tap(find.text('Keep account'));
+    await tester.pumpAndSettle();
+    expect(controller.repository, isNotNull);
+    expect(controller.demo, isTrue);
+    expect(find.text('Reset the demo?'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
 
   testWidgets('demo plan stays readable at narrow width and large text', (
     tester,

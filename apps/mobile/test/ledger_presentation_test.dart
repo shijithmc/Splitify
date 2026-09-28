@@ -66,7 +66,7 @@ void main() {
       expect(tester.takeException(), isNull);
     }
     await tester.scrollUntilVisible(
-      find.text('Split preview'),
+      find.text('Every share, clear'),
       160,
       scrollable: find.byType(Scrollable).first,
     );
