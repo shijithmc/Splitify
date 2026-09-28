@@ -7,9 +7,12 @@ import '../core/controller.dart';
 import '../core/design.dart';
 import '../core/receipts.dart';
 import '../core/models.dart';
+import '../core/native_services.dart';
+import '../core/phone_auth.dart';
 import '../core/repository.dart';
 import '../main.dart';
 import 'shared.dart';
+import 'phone_sign_in.dart';
 
 Future<void> openLink(BuildContext context, String url) async {
   if (url.isEmpty) {
@@ -301,21 +304,62 @@ class SettingsPage extends StatelessWidget {
           !identical(c.repository, repo)) {
         throw ApiFailure('Account changed. Start linking again from Settings.');
       }
-      await c.identity.reauthenticate(repo, currentProvider, account);
+      await _reauthenticate(context, repo, currentProvider, account);
       if (c.userId != account || !identical(c.repository, repo)) {
         throw ApiFailure('Account changed. Start linking again from Settings.');
       }
-      final proof = await c.identity.credential(repo, provider);
-      if (c.userId != account || !identical(c.repository, repo)) {
-        throw ApiFailure('Account changed. Start linking again from Settings.');
+      if (!context.mounted) return;
+      if (provider == 'phone') {
+        await _phoneVerification(context, repo, PhoneAuthPurpose.link, account);
+      } else {
+        final proof = await c.identity.credential(repo, provider);
+        if (c.userId != account || !identical(c.repository, repo)) {
+          throw ApiFailure(
+            'Account changed. Start linking again from Settings.',
+          );
+        }
+        await repo.request('POST', '/auth/link', proof);
       }
-      await repo.request('POST', '/auth/link', proof);
       await c.refresh();
       if (context.mounted) {
         message(context, 'Sign-in method linked to this account.');
       }
     });
   }
+
+  Future<void> _phoneVerification(
+    BuildContext context,
+    ApiRepository repo,
+    PhoneAuthPurpose purpose,
+    String account,
+  ) async {
+    final result = await openPage<Json>(
+      context,
+      c,
+      PhoneSignInPage(
+        service: PhoneAuthService(
+          repo,
+          purpose: purpose,
+          isCurrent: () => c.userId == account && identical(c.repository, repo),
+        ),
+      ),
+    );
+    if (result == null) throw IdentityCancelled();
+  }
+
+  Future<void> _reauthenticate(
+    BuildContext context,
+    ApiRepository repo,
+    String provider,
+    String account,
+  ) => provider == 'phone'
+      ? _phoneVerification(
+          context,
+          repo,
+          PhoneAuthPurpose.reauthenticate,
+          account,
+        )
+      : c.identity.reauthenticate(repo, provider, account);
 
   Future<void> deleteAccount(BuildContext context) async {
     final confirmDelete = await showDialog<bool>(
@@ -373,7 +417,8 @@ class SettingsPage extends StatelessWidget {
     }
     await act(context, () async {
       if (provider != null) {
-        await c.identity.reauthenticate(
+        await _reauthenticate(
+          context,
           repo as ApiRepository,
           provider,
           account,
@@ -1055,6 +1100,12 @@ Future<String?> _chooseProvider(
             onPressed: () => Navigator.pop(context, 'apple'),
             icon: const Icon(Icons.apple_rounded),
             label: Text('$action Apple'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(context, 'phone'),
+            icon: const Icon(Icons.phone_outlined),
+            label: Text('$action phone'),
           ),
           const SizedBox(height: 8),
           TextButton(

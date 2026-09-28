@@ -241,14 +241,15 @@ class ApiRepository implements Repository {
 
   @override
   Future<Json> request(String method, String path, [Json? data]) async {
-    if (_offline && method != 'GET') {
+    final authentication = path.startsWith('/auth/');
+    if (_offline && method != 'GET' && !authentication) {
       throw ApiFailure(
         'You are offline. Refresh before making changes.',
         code: 'offline',
       );
     }
     final command = jsonEncode([method, path, data]);
-    final key = method == 'GET'
+    final key = method == 'GET' || authentication
         ? const Uuid().v4()
         : _pendingKeys.putIfAbsent(command, () => const Uuid().v4());
     try {
@@ -256,9 +257,15 @@ class ApiRepository implements Repository {
       try {
         value = await _send(method, path, data, key);
       } on ApiFailure catch (error) {
+        final authenticatedPhoneAction =
+            path == '/auth/link' ||
+            (path.startsWith('/auth/phone/') &&
+                path != '/auth/phone/challenge');
+        final expiredSession =
+            error.code == 'session_expired' || error.code == 'session_invalid';
         if (error.status != 401 ||
             _session == null ||
-            path.startsWith('/auth/')) {
+            (authentication && !(authenticatedPhoneAction && expiredSession))) {
           rethrow;
         }
         await (_refreshing ??= _refresh());

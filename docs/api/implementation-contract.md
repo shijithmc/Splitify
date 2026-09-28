@@ -7,7 +7,10 @@ All endpoints have shared per-IP rate limits before authentication and per-accou
 ## HTTP API (under /v1)
 
 - POST /auth/dev `{displayName}` -> session (Development + explicit DevAuth only).
-- POST /auth/sign-in `{provider: google|apple, idToken, nonce, authorizationCode?}` -> session. GET /auth/challenge -> `{nonce}`.
+- POST /auth/sign-in `{provider: google|apple|phone, idToken, nonce, authorizationCode?, displayName?}` -> session. Google/Apple use an ID token; phone uses the six-digit SMS code in `idToken`. GET /auth/challenge -> `{nonce}` for Google/Apple.
+- POST /auth/phone/challenge `{phoneNumber}` -> `{nonce,expiresAt,resendAfterSeconds:60}`. Phone numbers require E.164 format including `+` and country code. The nonce is bound to that number and sign-in purpose; the response never contains the code.
+- POST /auth/phone/link/challenge `{phoneNumber}` -> the same challenge shape; requires recent authentication. Submit proof to `/auth/link` with `{provider:phone,idToken:code,nonce}`.
+- POST /auth/phone/reauthenticate/challenge `{phoneNumber}` -> the same challenge shape; requires an authenticated account with that linked phone. POST /auth/phone/reauthenticate `{nonce,code}` -> session for that same account, rotating the current session.
 - POST /auth/apple/callback accepts Apple form POST for configured Android web sign-in; validates the unexpired state and redirects only to the configured package.
 - POST /auth/refresh `{refreshToken}` -> session. POST /auth/sign-out -> 204.
 - POST /auth/link `{provider,idToken,nonce,authorizationCode?}` -> user; requires recent authentication.
@@ -47,3 +50,9 @@ Entitlement = `{adFree,status,expiresAt?,store?,verifiedAt?}`.
 Backend recomputes shares and enforces versions. Positive balance means is owed. 50 retained participants, one payer, INR only. Deleted expense restore window 30 days. Settlements reverse once on receiver dispute. Group reads use a version-stable snapshot.
 
 Private resources require current membership; unauthorized group access returns 404. Auth/device responses contain credentials or PII and must not be logged. The account merge conflict is deliberate: already-owned provider identities are not consolidated by this API.
+
+Phone challenges have separate purposes: sign-in, linking and reauthentication proof cannot be substituted for each other. Authenticated challenges bind the current account and authentication event; routine access-token refresh preserves them, while a different login or reauthentication does not. Linking remains an explicit action after reauthentication and cannot move a phone identity from another account. Phone login does not enable phone invitation discovery or automatically claim placeholder histories. SMS verification is server-side through Twilio Verify; missing or disabled provider configuration fails closed. See [authentication setup](../runbooks/authentication.md#configure-phone-otp) for service settings and live acceptance.
+
+A phone challenge expires after ten minutes and permits five provider code checks. A successful exchange consumes it atomically with the session or credential-link write. Resends request a new challenge and are subject to a shared 60-second per-number cooldown plus the [SMS attempt limits](../runbooks/api-rate-limits.md#phone-otp). The UI must use the returned nonce and expiry, never infer successful authentication from SMS delivery. `displayName` supplies a new account's name; returning phone sign-in preserves the existing profile and does not clear an email linked through Google/Apple. The session/user response shape is unchanged; no raw phone number is returned in `user`.
+
+Phone failures use the standard error envelope: `422 phone_invalid` for malformed numbers; `422 phone_code_invalid` for a malformed code; `401 phone_code_invalid` for rejected, expired or exhausted proof; `422 phone_not_linked` when reauthentication uses a number not linked to the current account; `429 phone_rate_limited` with `Retry-After` for SMS send/check limits; and `503 phone_unavailable` for disabled, missing or unavailable SMS service. Existing `challenge_invalid`, `challenge_expired`, `reauthentication_required`, `account_merge_required` and session errors still apply where their checks fail.

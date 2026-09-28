@@ -1,6 +1,6 @@
 # API abuse protection
 
-All HTTP requests pass shared admission before session lookup, body binding or endpoint work. Authenticated requests also consume account admission. DynamoDB stores conditional counters, so opening another session, changing receipt IDs/idempotency keys, restarting a Lambda or scaling out does not reset the allowance. Rejections return HTTP 429, `code: rate_limited`, `Retry-After` seconds and `Cache-Control: no-store`.
+All HTTP requests pass shared admission before session lookup, body binding or endpoint work. Authenticated requests also consume account admission. DynamoDB stores conditional counters, so opening another session, changing receipt IDs/idempotency keys, restarting a Lambda or scaling out does not reset the allowance. Shared admission rejections return HTTP 429, `code: rate_limited`, `Retry-After` seconds and `Cache-Control: no-store`.
 
 | Scope | Default ceiling |
 |---|---:|
@@ -14,7 +14,7 @@ All HTTP requests pass shared admission before session lookup, body binding or e
 
 The three AI entry routes are `POST /v1/groups/{groupId}/receipts`, `POST /v1/receipts/{id}/complete` and `POST /v1/receipts/{id}/retry`. Admission counts invalid/replayed requests too; existing idempotency still prevents duplicate work. Manual receipt creation shares the create route and its admission limit. Receipt polling, review, media and the remaining routes retain general admission, plus existing upload/download byte and monthly scan quotas.
 
-Request counters use fixed UTC minute windows. Traffic near a boundary can consume the allowance on both sides. Counter rows use `RATE#<scope>#<SHA256(subject)>`, the minute as sort key, and a short DynamoDB TTL; expiration is enforced by choosing the current window, never by waiting for asynchronous TTL deletion. Each scope is shared across routes. A conditional transaction admits all applicable counters or none. Persistent contention returns 429 with a one-second retry. Store errors fail closed through normal API error handling; no route runs unmetered.
+General request counters use fixed UTC minute windows. Traffic near a boundary can consume the allowance on both sides. Counter rows use `RATE#<scope>#<SHA256(subject)>`, the window number as sort key, and a short DynamoDB TTL; expiration is enforced by choosing the current window, never by waiting for asynchronous TTL deletion. Each scope is shared across routes. A conditional transaction admits all applicable counters or none. Persistent contention returns 429 with a one-second retry. Store errors fail closed through normal API error handling; no route runs unmetered.
 
 Source identity comes only from `Connection.RemoteIpAddress`. The [AWS HTTP API v2 adapter](https://github.com/aws/aws-lambda-dotnet/blob/master/Libraries/src/Amazon.Lambda.AspNetCoreServer/APIGatewayHttpApiV2ProxyFunction.cs) populates it from API Gateway's trusted request context. Forwarded IP, account and device headers are ignored. IPv4-mapped addresses are normalized; an IPv6 /64 shares an allowance. Missing source addresses share one conservative `unknown` bucket. Shared networks can therefore share an IP allowance. Do not enable arbitrary forwarded-header trust in front of this middleware.
 
@@ -23,6 +23,23 @@ Settings under `Hisaab:RateLimits` are `RequestsPerIpPerMinute`, `AuthRequestsPe
 The gateway retains 50 requests/second and burst 100 defaults, with 5 requests/second and burst 10 on each AI entry route. [AWS documents gateway throttling as best effort](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-throttling.html); the application counters and atomic worker budget provide separate enforcement. This is application abuse protection, not a claim of complete DDoS protection. Direct signed S3 uploads are bounded separately by size, checksum and expiry and do not pass API middleware.
 
 `Hisaab:Receipts:MonthlyBudgetUsd` now stops **all plans** before a provider attempt would exceed the conservative reserved liability. Set `MaxAttemptCostUsd` to a safe upper bound for the validated model and request limits; the application does not observe the final provider invoice. Failed/time-out attempts retain their liability. Provider enablement, consent, monthly allowances, the emergency stop and circuit breaker remain required. See [receipt operations](receipts.md).
+
+## Phone OTP
+
+Phone routes also receive the general authentication limits above. SMS sends share the following additional durable counters across sign-in, linking, reauthentication and all API instances. Windows align to Unix time; hour/day limits are fixed windows, not rolling allowances. Rejected provider sends retain their reserved allowance.
+
+| Scope | Ceiling |
+|---|---:|
+| SMS resend cooldown, per phone number | 60 seconds |
+| SMS sends, per source IP | 5/10 minutes and 20/day |
+| SMS sends, per phone number | 3/hour and 5/day |
+| SMS sends, entire environment | 10/minute and 100/day by default |
+| Code checks, per phone number across challenges | 10/10 minutes |
+| Code checks, per challenge | 5 within its 10-minute lifetime |
+
+Only the global SMS ceilings are configurable: `Hisaab:Auth:Phone:MaxSmsPerMinute` and `MaxSmsPerDay` accept `1`–`10000`; invalid values fail closed. Phone numbers use the keyed identity hash for counters. The cooldown is reserved before provider work, so even a failed send can require waiting before retrying. Twilio can apply tighter limits and destination restrictions. These attempt ceilings do not measure the final SMS invoice; configure provider geography, fraud controls and usage monitoring before enabling delivery. See [phone setup](authentication.md#configure-phone-otp).
+
+Phone admission failures return `429 phone_rate_limited` with `Retry-After` for the rejected local window or cooldown. Provider rate-limit responses use a conservative 60-second retry hint. Waiting does not guarantee admission if another applicable limit remains exhausted.
 
 ## Verification and rollout
 

@@ -3,7 +3,7 @@ using Hisaab.Application.Storage;
 
 namespace Hisaab.Api.Shared;
 
-public sealed record RequestRateLimit(string Scope, string Subject, int Limit);
+public sealed record RequestRateLimit(string Scope, string Subject, int Limit, int WindowSeconds = 60);
 public sealed record RequestRateUsage(int Count);
 public sealed record RateLimitDecision(bool Allowed, int RetryAfterSeconds);
 
@@ -15,18 +15,18 @@ public sealed class DistributedRateLimiter(IAtomicStore store, TimeProvider cloc
         for (var attempt = 0; attempt < 5; attempt++)
         {
             var now = clock.GetUtcNow().ToUnixTimeSeconds();
-            var window = now / 60;
-            var retryAfter = (int)((window + 1) * 60 - now);
             var writes = new List<StoreMutation>();
             foreach (var limit in limits)
             {
+                var window = now / limit.WindowSeconds;
+                var retryAfter = (int)((window + 1) * limit.WindowSeconds - now);
                 var pk = $"RATE#{limit.Scope}#{Ids.Hash(limit.Subject)}";
                 var sk = window.ToString(CultureInfo.InvariantCulture);
                 var row = await store.GetAsync(pk, sk, ct);
                 var count = row?.Deserialize<RequestRateUsage>().Count ?? 0;
                 if (count >= limit.Limit) return new(false, retryAfter);
                 writes.Add(StoreMutation.Put(StoreRow.Create(pk, sk, (row?.Version ?? 0) + 1,
-                    new RequestRateUsage(count + 1), (window + 2) * 60), row?.Version));
+                    new RequestRateUsage(count + 1), (window + 2) * limit.WindowSeconds), row?.Version));
             }
             try
             {

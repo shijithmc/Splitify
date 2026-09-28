@@ -29,11 +29,11 @@ curl -s http://localhost:5080/v1/auth/dev \
   -d '{"displayName":"Aarav"}'
 ```
 
-Use the returned access token as `Authorization: Bearer …`. Ledger mutations require a UUID `Idempotency-Key`. See the [API contract](docs/api/implementation-contract.md). The mobile app's real login uses Apple/Google; it never silently switches to developer authentication.
+Use the returned access token as `Authorization: Bearer …`. Ledger mutations require a UUID `Idempotency-Key`. See the [API contract](docs/api/implementation-contract.md). The mobile app's real login uses Apple, Google or SMS OTP; it never silently switches to developer authentication.
 
 ## What is implemented
 
-- Apple/Google token verification, rotating sessions, explicit credential linking and resumable account deletion.
+- Apple/Google token verification and Twilio Verify phone OTP, rotating sessions, explicit credential linking and resumable account deletion.
 - Groups/direct friends, scoped invitations and placeholder history claims; archive/leave rules and retained-member limits.
 - Integer-paise equal/exact/percentage/shares splits, visible rounding, version conflicts, atomic ledger updates, delete/restore and payment disputes.
 - Foreground refresh, account-scoped read-only offline cache, activity and independently configurable push notifications.
@@ -63,7 +63,7 @@ Backend tests cover ledger conservation, concurrent/replayed mutations, authoriz
 ## Configuration and operations
 
 - [Mobile setup](apps/mobile/README.md): native identifiers, sign-in, Firebase, store products, legal URLs, ads and invite associations.
-- [Authentication setup](docs/runbooks/authentication.md): Google/Apple registrations, matching client/server configuration, signing and live-device acceptance.
+- [Authentication setup](docs/runbooks/authentication.md): Google/Apple registrations, Twilio Verify configuration, matching client/server configuration, signing and live-device acceptance.
 - [Infrastructure setup](infra/Hisaab.Cdk/README.md): publish assets, synthesize templates and configure an existing Secrets Manager secret.
 - [Configuration keys](.env.example): empty example only; never commit populated secrets.
 - [Support runbook](docs/runbooks/support.md): account/transaction lookup and audited, expiring grants.
