@@ -24,6 +24,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Timer? _poll;
   bool _active = true;
   bool _openingNotification = false;
+  final _groupSearch = TextEditingController();
+  String _groupFilter = 'All';
   AppController get c => widget.controller;
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _poll?.cancel();
+    _groupSearch.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -214,7 +217,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ),
           ],
         ),
-        floatingActionButton: c.tab == 1
+        floatingActionButton: c.tab < 3
             ? FloatingActionButton.extended(
                 onPressed: c.offline ? null : () => _addExpense(),
                 icon: const Icon(Icons.add),
@@ -225,7 +228,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             : null,
         bottomNavigationBar: NavigationBar(
           selectedIndex: c.tab,
-          onDestinationSelected: c.selectTab,
+          onDestinationSelected: (tab) {
+            FocusScope.of(context).unfocus();
+            c.selectTab(tab);
+          },
           backgroundColor: const Color(0xFFFFFEF9),
           indicatorColor: HisaabColors.mint,
           destinations: const [
@@ -315,7 +321,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'LET’S MAKE ROOM FOR GOOD TIMES',
+                    'YOUR SHARED EXPENSES',
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: .7,
@@ -402,7 +408,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               const SizedBox(height: 9),
               Text(
                 net == 0
-                    ? 'You’re all square overall'
+                    ? ((c.balances['owedPaise'] as int? ?? 0) > 0 ||
+                              (c.balances['owingPaise'] as int? ?? 0) > 0
+                          ? 'Your balances cancel out overall'
+                          : 'No net balance overall')
                     : net > 0
                     ? 'You’re owed overall'
                     : 'You owe overall',
@@ -415,7 +424,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 children: [
                   Expanded(
                     child: _metric(
-                      'You get back',
+                      'You are owed',
                       c.balances['owedPaise'] ?? 0,
                       Icons.south_west,
                     ),
@@ -438,12 +447,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _quickAction(
-              'Add expense',
-              Icons.add_rounded,
-              const Color(0xFFDDEAAB),
-              () => _addExpense(),
-            ),
-            _quickAction(
               'Scan bill',
               Icons.document_scanner_outlined,
               HisaabColors.peach,
@@ -458,7 +461,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ],
         ),
         SectionTitle(
-          'Your people, your plans',
+          'Your groups',
           trailing: TextButton(
             onPressed: () => c.selectTab(1),
             child: const Text('See all →'),
@@ -468,7 +471,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           EmptyCard(
             icon: Icons.people_outline,
             illustrationAsset: 'assets/illustrations/shared-home.png',
-            title: 'Bring your people',
+            title: 'Split your first expense',
             body:
                 'Create your first group and keep everyone’s share in one place.',
             action: FilledButton(
@@ -477,10 +480,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ),
           )
         else ...[
-          _momentsBanner(),
           ...activeGroups.take(3).map(_groupTile),
         ],
-        const SectionTitle('Between friends'),
+        const SectionTitle('Balances with friends'),
         if (rows(c.balances['friends']).isEmpty)
           const Text('All clear. Your shared balances will appear here.')
         else
@@ -498,7 +500,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                   title: Text(f['displayName']),
                   subtitle: Text(
-                    '${value >= 0 ? 'Owes you' : 'You owe'} ${money(value.abs())}',
+                    value == 0
+                        ? 'No net balance'
+                        : '${value > 0 ? 'Owes you' : 'You owe'} ${money(value.abs())}',
                     style: TextStyle(
                       color: value >= 0
                           ? HisaabColors.positive
@@ -510,52 +514,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               }).toList(),
             ),
           ),
+        const SizedBox(height: 85),
       ],
     );
   }
-
-  Widget _momentsBanner() => Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.only(right: 14),
-    decoration: BoxDecoration(
-      color: HisaabColors.illustrationBackground,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Row(
-      children: [
-        const Expanded(
-          child: EditorialArtwork(
-            asset: 'assets/illustrations/moments.png',
-            height: 112,
-            borderRadius: BorderRadius.zero,
-            fit: BoxFit.cover,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Text.rich(
-              const TextSpan(
-                text: 'Collect moments.\n',
-                children: [
-                  TextSpan(
-                    text: 'We’ll keep the totals.',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: HisaabColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 
   Widget _quickAction(
     String label,
@@ -700,14 +662,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ),
   );
 
-  Widget _groupCopy(Group g, {bool featured = false}) => Column(
+  Widget _groupCopy(Group g) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
         g.name,
         style: TextStyle(
-          fontFamily: featured ? 'Outfit' : 'WorkSans',
-          fontSize: featured ? 23 : 16,
+          fontFamily: 'WorkSans',
+          fontSize: 16,
           fontWeight: FontWeight.w600,
           height: 1.3,
         ),
@@ -720,7 +682,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       const SizedBox(height: 5),
       Text(
         g.net == 0
-            ? 'Settled up'
+            ? 'No net balance'
             : '${g.net > 0 ? 'You get back' : 'You owe'} ${money(g.net.abs())}',
         style: TextStyle(
           color: g.net < 0 ? HisaabColors.warning : HisaabColors.positive,
@@ -731,130 +693,149 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ],
   );
 
-  Widget _featuredGroup(Group g) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Card(
-      color: HisaabColors.illustrationBackground,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () =>
-            openPage(context, c, GroupPage(controller: c, groupId: g.id)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            EditorialArtwork(
-              asset: g.type == 'Home'
-                  ? 'assets/illustrations/shared-home.png'
-                  : 'assets/illustrations/moments.png',
-              height: 196,
-              borderRadius: BorderRadius.zero,
-              fit: BoxFit.cover,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-              child: Row(
-                children: [
-                  Expanded(child: _groupCopy(g, featured: true)),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: HisaabColors.lime,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.arrow_forward,
-                      color: HisaabColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  Widget _groups() => PageBody(
-    children: [
-      SectionTitle(
-        'Life, in good company',
-        trailing: IconButton(
-          tooltip: 'Create group or friend',
-          onPressed: c.offline ? null : () => createGroup(context, c),
-          icon: const Icon(Icons.add_circle_outline),
-        ),
-      ),
-      const Text('Little circles. Big memories.'),
-      const SizedBox(height: 20),
-      if (c.invites.isNotEmpty) ...[
-        const SectionTitle('Waiting for you'),
-        ...c.invites.map(
-          (invite) => Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: const Icon(Icons.mail_outline),
-              title: Text(invite['groupName'] ?? 'A shared circle'),
-              subtitle: const Text('Invitation to your verified email'),
-              trailing: TextButton(
-                onPressed: c.offline
-                    ? null
-                    : () => act(context, () async {
-                        final joined = await c.request(
-                          'POST',
-                          '/invites/accept',
-                          {'token': invite['token']},
-                        );
-                        await c.refresh();
-                        if (mounted) {
-                          await openPage(
-                            context,
-                            c,
-                            GroupPage(controller: c, groupId: joined['id']),
-                          );
-                        }
-                      }),
-                child: const Text('Join'),
-              ),
-            ),
-          ),
-        ),
-      ],
-      if (c.groups.isEmpty)
-        EmptyCard(
-          icon: Icons.group_add_outlined,
-          illustrationAsset: 'assets/illustrations/shared-home.png',
-          title: 'Start your first circle',
-          body: 'Home, holidays, your person, or just a friend.',
-          action: FilledButton(
+  Widget _groups() {
+    final query = _groupSearch.text.trim().toLowerCase();
+    final visible = c.groups.where((g) {
+      final matchesFilter = switch (_groupFilter) {
+        'Groups' => !g.archived && g.type != 'Direct',
+        'Friends' => !g.archived && g.type == 'Direct',
+        'Archived' => g.archived,
+        _ => !g.archived,
+      };
+      return matchesFilter && g.name.toLowerCase().contains(query);
+    }).toList();
+    return PageBody(
+      children: [
+        SectionTitle(
+          'Groups & friends',
+          trailing: TextButton.icon(
             onPressed: c.offline ? null : () => createGroup(context, c),
-            child: const Text('Create a group'),
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text('New'),
           ),
         ),
-      if (c.groups.isNotEmpty) ...[
-        _featuredGroup(c.groups.first),
-        ...c.groups.skip(1).map(_groupTile),
-        const SizedBox(height: 20),
-        OutlinedButton.icon(
-          onPressed: c.offline ? null : () => createGroup(context, c),
-          icon: const Icon(Icons.add),
-          label: const Text('Create a new group'),
+        const Text('Find a group, check your balance, or add an expense.'),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _groupSearch,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Search groups and friends',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: query.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(_groupSearch.clear),
+                  ),
+          ),
+          onChanged: (_) => setState(() {}),
         ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ['All', 'Groups', 'Friends', 'Archived']
+              .map(
+                (filter) => ChoiceChip(
+                  label: Text(filter),
+                  selected: _groupFilter == filter,
+                  onSelected: (_) => setState(() => _groupFilter = filter),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        if (c.invites.isNotEmpty) ...[
+          const SectionTitle('Waiting for you'),
+          ...c.invites.map(
+            (invite) => Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: const Icon(Icons.mail_outline),
+                title: Text(invite['groupName'] ?? 'A shared circle'),
+                subtitle: const Text('Invitation to your verified email'),
+                trailing: TextButton(
+                  onPressed: c.offline
+                      ? null
+                      : () => act(context, () async {
+                          final joined = await c.request(
+                            'POST',
+                            '/invites/accept',
+                            {'token': invite['token']},
+                          );
+                          await c.refresh();
+                          if (mounted) {
+                            await openPage(
+                              context,
+                              c,
+                              GroupPage(controller: c, groupId: joined['id']),
+                            );
+                          }
+                        }),
+                  child: const Text('Join'),
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (c.groups.isEmpty)
+          EmptyCard(
+            icon: Icons.group_add_outlined,
+            illustrationAsset: 'assets/illustrations/shared-home.png',
+            title: 'No groups yet',
+            body:
+                'Create a group for a trip or home, or split directly with a friend.',
+            action: FilledButton(
+              onPressed: c.offline ? null : () => createGroup(context, c),
+              child: const Text('Create a group'),
+            ),
+          ),
+        if (c.groups.isNotEmpty && visible.isEmpty)
+          EmptyCard(
+            icon: Icons.search_off,
+            title: query.isNotEmpty ? 'No matches' : 'Nothing here yet',
+            body: query.isNotEmpty
+                ? 'Try another name or choose a different filter.'
+                : _groupFilter == 'Archived'
+                ? 'Archived groups stay here so you can revisit their history.'
+                : _groupFilter == 'Friends'
+                ? 'Use New to start sharing expenses with a friend.'
+                : 'Use New to create a group, or check another filter.',
+            action: query.isNotEmpty
+                ? TextButton(
+                    onPressed: () => setState(() {
+                      _groupSearch.clear();
+                      _groupFilter = 'All';
+                    }),
+                    child: const Text('Clear search and filters'),
+                  )
+                : null,
+          ),
+        if (visible.isNotEmpty) ...[
+          ...visible.map(_groupTile),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: c.offline ? null : () => createGroup(context, c),
+            icon: const Icon(Icons.add),
+            label: const Text('Create a new group'),
+          ),
+        ],
+        const SizedBox(height: 85),
       ],
-      const SizedBox(height: 85),
-    ],
-  );
+    );
+  }
+
   Widget _activity() => PageBody(
     children: [
-      const SectionTitle('The latest'),
-      const Text('A little history keeps everyone on the same page.'),
+      const SectionTitle('Recent activity'),
+      const Text('Expenses and payments from all your groups.'),
       const SizedBox(height: 22),
       if (c.activity.isEmpty)
         const EmptyCard(
           icon: Icons.receipt_long_outlined,
-          title: 'A fresh start',
+          title: 'No activity yet',
           body: 'Expenses and payments will show up here.',
         ),
       ...c.activity.map(
@@ -883,6 +864,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ),
         ),
       ),
+      const SizedBox(height: 85),
     ],
   );
   Future<void> _addExpense() async {
@@ -1177,7 +1159,7 @@ Future<void> createGroup(BuildContext context, AppController c) async {
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('Make a new circle'),
+        title: const Text('New group or friend'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1198,7 +1180,7 @@ Future<void> createGroup(BuildContext context, AppController c) async {
                     .map(
                       (t) => DropdownMenuItem(
                         value: t,
-                        child: Text(t == 'Direct' ? 'Direct friend' : t),
+                        child: Text(t == 'Direct' ? 'Friend' : t),
                       ),
                     )
                     .toList(),
