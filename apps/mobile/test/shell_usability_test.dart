@@ -57,7 +57,12 @@ void main() {
     expect(find.text('Add expense').hitTestable(), findsOneWidget);
     await tester.tap(find.text('Add expense'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ListTile, 'Goa, here we come'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.widgetWithText(ListTile, 'Goa, here we come'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(ExpensePage), findsOneWidget);
     expect(c.protectedDepth, 2);

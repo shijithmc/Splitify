@@ -38,111 +38,39 @@ class SettingsPage extends StatelessWidget {
     final displayName = name == null || name.isEmpty ? 'Your account' : name;
     return PageBody(
       children: [
-        const SectionTitle('Make yourself at home'),
-        const Text(
-          'Your account, your preferences, your peace of mind.',
-          style: TextStyle(color: HisaabColors.muted, height: 1.5),
-        ),
-        const SizedBox(height: 22),
         Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: HisaabColors.peach,
-                  foregroundColor: HisaabColors.ink,
-                  child: Text(
-                    displayName.characters.first.toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 26,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: CircleAvatar(
+              radius: 24,
+              backgroundColor: HisaabColors.mint,
+              foregroundColor: HisaabColors.ink,
+              child: Text(
+                displayName.characters.first.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayName,
-                        style: const TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 21,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        c.demo
-                            ? 'Local demo · no real account'
-                            : c.user['email'] ?? 'Private account',
-                        style: const TextStyle(
-                          color: HisaabColors.muted,
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
+            ),
+            title: Text(
+              displayName,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              c.demo
+                  ? 'Local demo · no real account'
+                  : c.user['email'] ?? 'Private account',
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Card(
-          color: HisaabColors.lilac,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const _AccountIcon(Icons.auto_awesome_outlined),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _planLabel(c),
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontSize: 21,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            c.adFree
-                                ? 'More room for the moments that matter.'
-                                : 'Everyday splitting stays free.',
-                            style: const TextStyle(height: 1.5),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        openPage(context, c, PremiumPage(controller: c)),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                    label: Text(
-                      c.adFree ? 'View your plan' : 'Explore ad-free',
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: _AccountRow(
+            icon: Icons.block_outlined,
+            title: _planLabel(c),
+            subtitle: c.adFree ? 'View your plan' : 'Explore ad-free',
+            onTap: () => openPage(context, c, PremiumPage(controller: c)),
           ),
         ),
         const SectionTitle('Notifications'),
@@ -157,8 +85,8 @@ class SettingsPage extends StatelessWidget {
               }.entries)
                 SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 4,
+                    horizontal: 16,
+                    vertical: 0,
                   ),
                   title: Text(entry.value),
                   subtitle: entry.key == 'receiptDetails'
@@ -177,7 +105,7 @@ class SettingsPage extends StatelessWidget {
                           await c.refresh();
                         }),
                 ),
-              const Divider(height: 1, indent: 20, endIndent: 20),
+              const Divider(height: 1, indent: 16, endIndent: 16),
               _AccountRow(
                 icon: Icons.notifications_outlined,
                 title: 'Enable push on this device',
@@ -256,7 +184,7 @@ class SettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 28),
         const Text(
-          'Made for shared moments.\nHisaab · INR · 1.0.0',
+          'Hisaab · INR · 1.0.0',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -479,10 +407,10 @@ class _PremiumPageState extends State<PremiumPage> {
           ),
           const SizedBox(height: 22),
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: HisaabColors.lilac,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -496,8 +424,7 @@ class _PremiumPageState extends State<PremiumPage> {
                       Text(
                         'Good company.\nZero interruptions.',
                         style: TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 25,
+                          fontSize: 20,
                           fontWeight: FontWeight.w500,
                           letterSpacing: -.6,
                           height: 1.15,
@@ -531,21 +458,17 @@ class _PremiumPageState extends State<PremiumPage> {
           Card(
             color: HisaabColors.mint,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(12),
               side: const BorderSide(color: HisaabColors.primary, width: 1.5),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Yearly',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   const Text(
@@ -592,8 +515,7 @@ class _PremiumPageState extends State<PremiumPage> {
                         TextSpan(
                           text: package.storeProduct.priceString,
                           style: const TextStyle(
-                            fontFamily: 'Outfit',
-                            fontSize: 36,
+                            fontSize: 28,
                             fontWeight: FontWeight.w600,
                             color: HisaabColors.ink,
                           ),
@@ -601,7 +523,6 @@ class _PremiumPageState extends State<PremiumPage> {
                             TextSpan(
                               text: ' / year',
                               style: TextStyle(
-                                fontFamily: 'WorkSans',
                                 fontSize: 16,
                                 fontWeight: FontWeight.w400,
                                 color: HisaabColors.muted,
@@ -805,16 +726,16 @@ class _AccountIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
     child: Container(
-      width: 44,
-      height: 44,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         color: destructive ? HisaabColors.peach : HisaabColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         icon,
         color: destructive ? clay : HisaabColors.primary,
-        size: 23,
+        size: 20,
       ),
     ),
   );
@@ -835,7 +756,7 @@ class _AccountRow extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     leading: _AccountIcon(icon, destructive: destructive),
     title: Text(title, style: TextStyle(color: destructive ? clay : null)),
     subtitle: subtitle == null ? null : Text(subtitle!),
@@ -858,10 +779,10 @@ class _AccountNotice extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(12),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -956,8 +877,7 @@ Future<String?> _chooseProvider(
           Text(
             title,
             style: const TextStyle(
-              fontFamily: 'Outfit',
-              fontSize: 26,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
               height: 1.2,
             ),

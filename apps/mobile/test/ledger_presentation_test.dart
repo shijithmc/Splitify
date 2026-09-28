@@ -148,7 +148,7 @@ void main() {
         'Record a payment you have already made. Hisaab does not move money.';
     await tester.scrollUntilVisible(
       find.text(explanation),
-      160,
+      -160,
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text(explanation), findsOneWidget);
