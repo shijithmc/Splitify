@@ -154,5 +154,5 @@ Json newReceiptDraft(String groupId, {String? expenseId}) => {
   'createKey': const Uuid().v4(),
   'completeKey': const Uuid().v4(),
   'saveKey': const Uuid().v4(),
-  'scanRequested': true,
+  'scanRequested': false,
 };

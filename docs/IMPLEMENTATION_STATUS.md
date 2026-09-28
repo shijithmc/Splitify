@@ -1,6 +1,12 @@
 # Implementation status
 
-Updated 26 September 2026. Source implementation follows the accepted defaults in ADR 0001. The original plan remains a historical design/acceptance document; it is not a claim that external release gates passed.
+Updated 28 September 2026. Source implementation follows the accepted defaults in ADR 0001. The original plan remains a historical design/acceptance document; it is not a claim that external release gates passed.
+
+## AI scanning removal — 28 September 2026
+
+AI bill scanning, scan allowance/consent/retry controls, provider integration and evaluation tooling have been removed. Manual receipt photos, entered items/totals, split review, existing receipts and private media retention remain. Legacy scan requests return 410 and queued work is handled without inference. General API limits and stricter receipt upload limits remain. Earlier dated verification and feature descriptions below are historical records, superseded by this removal and the [current receipt contract](api/receipts-contract.md).
+
+Removal verification: 286 .NET tests (171 API, 81 domain, 23 infrastructure, 11 support), 87 default Flutter tests plus four explicit ad-policy tests, clean Flutter analysis, and Linux ARM64 API/worker publishing. Regression coverage includes rejected legacy scans, pending scan conversion, preserved historical receipts, interrupted mobile uploads and manual upload limits.
 
 ## Delivered source
 
@@ -50,7 +56,7 @@ Capture limits: edge detection is a bounded rectangular estimate with explicit c
 
 **Still gated:** live Mumbai Vertex/WIF/token renewal, 200+ permissioned real-bill evaluation, production IAM/load/latency, billing reconciliation, physical-device camera/crop/HEIC/PDF/accessibility and signed push/store journeys. Scanning remains off by default. Flutter 3.44.6 already sets the effective Android minSdk to 24 (the existing maxOf expression is preserved). The original Android 23 support claim therefore needs a separately validated toolchain. Native HEIC works only on Android 28+ or iOS; older Android HEIC acceptance remains unresolved. Raw support diagnostics and production correction/conversion analytics are not implemented. Per-unit allocation and background OS upload jobs remain deferred as recorded in ADR 0002.
 
-See [receipt contract](api/receipts-contract.md), [operations](runbooks/receipts.md), [accepted implementation defaults](decisions/0002-snap-split.md) and [evaluation harness](../tools/Hisaab.ReceiptEval/README.md). No cloud deployment or real AI benchmark ran in this implementation.
+See [receipt contract](api/receipts-contract.md), [operations](runbooks/receipts.md), [accepted implementation defaults](decisions/0002-snap-split.md). No cloud deployment or real AI benchmark ran in this implementation.
 
 ## Release gates
 

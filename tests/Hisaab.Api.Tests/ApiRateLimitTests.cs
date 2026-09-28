@@ -99,26 +99,26 @@ public sealed class ApiRateLimitTests
     }
 
     [Fact]
-    public async Task AllAiEntryRoutesShareTheAccountLimitDespiteNewIdsKeysAndServerInstances()
+    public async Task ReceiptUploadRoutesShareTheAccountLimitDespiteNewIdsKeysAndServerInstances()
     {
         using var factory = new ApiFactory();
-        using var first = factory.WithWebHostBuilder(builder => Configure(builder, limits => limits.AiRequestsPerAccountPerMinute = 3));
-        using var second = factory.WithWebHostBuilder(builder => Configure(builder, limits => limits.AiRequestsPerAccountPerMinute = 3));
+        using var first = factory.WithWebHostBuilder(builder => Configure(builder, limits => limits.ReceiptRequestsPerAccountPerMinute = 3));
+        using var second = factory.WithWebHostBuilder(builder => Configure(builder, limits => limits.ReceiptRequestsPerAccountPerMinute = 3));
         using var client = first.CreateClient();
         using var otherServer = second.CreateClient();
         var session = await ApiSession.Json(client, HttpMethod.Post, "/v1/auth/dev", new { displayName = "Alice" });
         var bearer = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.GetProperty("accessToken").GetString());
         client.DefaultRequestHeaders.Authorization = bearer;
         otherServer.DefaultRequestHeaders.Authorization = bearer;
-        // Invalid bodies also consume admission; none can enqueue inference.
-        foreach (var path in new[] { "/v1/groups/unknown/receipts", "/v1/receipts/a/complete", "/v1/receipts/b/retry" })
+        // Invalid bodies also consume admission; none can enqueue receipt processing.
+        foreach (var path in new[] { "/v1/groups/unknown/receipts", "/v1/receipts/a/complete", "/v1/groups/another/receipts" })
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, path);
             request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
             using var response = await client.SendAsync(request);
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
-        using var limited = await otherServer.PostAsJsonAsync("/V1/receipts/new/retry/", new { version = 1 });
+        using var limited = await otherServer.PostAsJsonAsync("/V1/receipts/new/complete/", new { version = 1 });
         await AssertLimited(limited);
         Assert.Equal(HttpStatusCode.OK, (await otherServer.GetAsync("/v1/me")).StatusCode);
     }
@@ -142,12 +142,12 @@ public sealed class ApiRateLimitTests
     }
 
     [Fact]
-    public async Task AiIngressLimitRunsBeforeAuthenticationAndStoreFailureFailsClosed()
+    public async Task ReceiptIngressLimitRunsBeforeAuthenticationAndStoreFailureFailsClosed()
     {
         using var factory = new ApiFactory();
-        using var host = factory.WithWebHostBuilder(builder => Configure(builder, limits => limits.AiRequestsPerIpPerMinute = 1));
+        using var host = factory.WithWebHostBuilder(builder => Configure(builder, limits => limits.ReceiptRequestsPerIpPerMinute = 1));
         using var client = host.CreateClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/v1/receipts/a/retry", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/v1/receipts/a/complete", new { })).StatusCode);
         using var limited = await client.PostAsJsonAsync("/v1/groups/b/receipts", new { });
         await AssertLimited(limited);
 

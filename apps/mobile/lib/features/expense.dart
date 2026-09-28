@@ -380,8 +380,8 @@ class _ExpensePageState extends State<ExpensePage> {
                 );
                 if (saved == true && context.mounted) Navigator.pop(context);
               },
-              icon: const Icon(Icons.document_scanner_outlined),
-              label: const Text('Scan bill'),
+              icon: const Icon(Icons.attach_file_rounded),
+              label: const Text('Attach receipt'),
             ),
           ],
           if (error != null)

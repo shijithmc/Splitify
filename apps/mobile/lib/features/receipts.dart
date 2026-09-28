@@ -16,7 +16,6 @@ import '../core/receipt_preview.dart';
 import '../core/receipts.dart';
 import '../main.dart';
 import 'receipt_camera.dart';
-import 'settings.dart';
 import 'shared.dart';
 
 class ReceiptCapturePage extends StatefulWidget {
@@ -39,7 +38,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
   late final ReceiptCoordinator receipts;
   Json? draft;
   String? error;
-  bool loading = true, picking = false, consent = false;
+  bool loading = true, picking = false;
   bool foreground = true;
   @override
   void initState() {
@@ -61,7 +60,6 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
       setState(() => foreground = state == AppLifecycleState.resumed);
     }
     if (state == AppLifecycleState.resumed) {
-      unawaited(receipts.refreshAllowance().catchError((Object _) {}));
       unawaited(receipts.pump());
     }
   }
@@ -69,9 +67,6 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
   Future<void> load() async {
     try {
       await receipts.initialize();
-      try {
-        await receipts.refreshAllowance();
-      } catch (_) {}
       final old = receipts.drafts.where(
         (d) => d['groupId'] == widget.group.id && d['status'] != 'attached',
       );
@@ -201,21 +196,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
     }
   }
 
-  Future<void> start(bool scan) async {
-    await act(context, () async {
-      if (scan && receipts.allowance['consentAccepted'] != true) {
-        if (!consent) {
-          throw ApiFailure(
-            'Accept the processing notice, or choose manual entry.',
-          );
-        }
-        draft!['consentIntent'] =
-            receipts.allowance['consentVersion'] ?? '2026-09-26-v1';
-        await receipts.persist(draft!);
-      }
-      await receipts.queue(draft!, scan: scan);
-    });
-  }
+  Future<void> start() => act(context, () => receipts.queue(draft!));
 
   Future<void> review() async {
     draft!['review'] ??= emptyReceiptReview();
@@ -256,8 +237,6 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
       final state = draft?['status'] ?? 'capture';
       final server = object(draft?['server']);
       final images = rows(draft?['images']);
-      final remaining = receipts.allowance['remaining'];
-      final cap = receipts.allowance['cap'];
       final capturing =
           server.isEmpty && !['queued_upload', 'processing'].contains(state);
       final processing = ['queued_upload', 'processing'].contains(state);
@@ -273,7 +252,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
               server['manualAvailable'] == true ||
               rows(server['media']).isNotEmpty);
       return Scaffold(
-        appBar: AppBar(title: const Text('Snap & Split')),
+        appBar: AppBar(title: const Text('Attach receipt')),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : draft == null
@@ -291,8 +270,8 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                   const SizedBox(height: 8),
                   Text(
                     c.demo
-                        ? 'LOCAL DEMO · No image is sent to Google.'
-                        : 'We read the bill. You stay in control of every amount and every split.',
+                        ? 'LOCAL DEMO · Your photos stay on this device.'
+                        : 'Keep the receipt with your expense. Enter the amounts and choose how to split them.',
                     style: const TextStyle(color: HisaabColors.muted),
                   ),
                   if (capturing && images.isEmpty) ...[
@@ -303,51 +282,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (remaining != null)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: HisaabColors.mint,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.document_scanner_outlined,
-                            color: HisaabColors.teal,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '$remaining of $cap scans left this month',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: HisaabColors.teal,
-                                  ),
-                                ),
-                                const Text(
-                                  'Monthly reset in IST · Manual entry is always available',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: HisaabColors.teal,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 18),
                   _ReceiptSteps(current: capturing || processing ? 0 : 1),
-                  if (receipts.allowance['reserved'] is int &&
-                      receipts.allowance['reserved'] > 0)
-                    Text(
-                      '${receipts.allowance['reserved']} scan(s) in progress',
-                    ),
                   if (receipts.notice != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -464,71 +399,14 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                         child: LinearProgressIndicator(),
                       ),
                     const SizedBox(height: 20),
-                    if (!c.demo &&
-                        receipts.allowance['consentAccepted'] != true)
-                      Card(
-                        color: HisaabColors.peach,
-                        child: CheckboxListTile(
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: const EdgeInsets.all(12),
-                          value: consent,
-                          title: const Text(
-                            'Allow Google AI to read this bill',
-                          ),
-                          subtitle: const Text(
-                            'Bill images may contain names, phone numbers, addresses, and payment details. Google processes the image to extract items and totals. Only your current group members can see the saved receipt. You can enter it manually without AI.',
-                          ),
-                          onChanged: (value) =>
-                              setState(() => consent = value == true),
-                        ),
+                    FilledButton.icon(
+                      onPressed: images.isEmpty || picking ? null : start,
+                      icon: const Icon(Icons.attach_file_rounded),
+                      label: Text(
+                        c.offline
+                            ? 'Queue receipt for upload'
+                            : 'Attach photos & enter details',
                       ),
-                    const SizedBox(height: 12),
-                    if (receipts.allowance['scanAvailable'] == false) ...[
-                      Text(
-                        receipts.allowance['reason'] != 'scan_limit_reached'
-                            ? 'Bill scanning is temporarily unavailable. You can still enter an expense manually with its photos.'
-                            : cap == 100
-                            ? 'Monthly scan allowance reached. It resets next month; manual entry remains available.'
-                            : 'Your free scan allowance is used. Premium includes up to 100 scans per month.',
-                      ),
-                      if (cap != 100 &&
-                          receipts.allowance['reason'] == 'scan_limit_reached')
-                        TextButton(
-                          onPressed: () async {
-                            await openPage(
-                              context,
-                              c,
-                              PremiumPage(controller: c),
-                            );
-                            try {
-                              await receipts.refreshAllowance();
-                            } catch (_) {}
-                          },
-                          child: const Text('See Premium'),
-                        ),
-                    ] else
-                      FilledButton.icon(
-                        onPressed:
-                            images.isEmpty ||
-                                picking ||
-                                (!c.demo &&
-                                    receipts.allowance['consentAccepted'] !=
-                                        true &&
-                                    !consent)
-                            ? null
-                            : () => start(true),
-                        icon: const Icon(Icons.document_scanner_outlined),
-                        label: Text(
-                          c.offline
-                              ? 'Queue scan for when online'
-                              : 'Read bill',
-                        ),
-                      ),
-                    TextButton(
-                      onPressed: images.isEmpty || picking
-                          ? null
-                          : () => start(false),
-                      child: const Text('Enter manually with these photos'),
                     ),
                     if (c.demo)
                       TextButton.icon(
@@ -553,7 +431,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                     Text(
                       state == 'queued_upload'
                           ? 'Will upload when connected and Hisaab is open.'
-                          : 'Reading your bill… You can leave this screen; your draft is kept.',
+                          : 'Preparing your receipt… You can leave this screen; your draft is kept.',
                     ),
                     TextButton(
                       onPressed: () => receipts.pump(),
@@ -577,24 +455,14 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 18),
                       child: Text(
-                        'This bill was hard to read. Flatten it, avoid glare, and try a clearer photo.',
+                        'Enter the amounts from this receipt, or attach a clearer photo.',
                       ),
                     ),
                   if (state == 'failed')
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Couldn’t read the bill. Enter the details manually; your photo stays attached.',
-                          ),
-                          if ((server['attempts'] as int? ?? 0) < 3)
-                            TextButton(
-                              onPressed: () =>
-                                  act(context, () => receipts.retry(draft!)),
-                              child: const Text('Try reading again'),
-                            ),
-                        ],
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 18),
+                      child: Text(
+                        'Couldn’t prepare the receipt. If its photo is available, enter the details below. Otherwise attach a new photo.',
                       ),
                     ),
                   if (editable)
@@ -613,7 +481,7 @@ class _ReceiptCapturePageState extends State<ReceiptCapturePage>
                         final next = await receipts.create(widget.group.id);
                         if (mounted) setState(() => draft = next);
                       },
-                      child: const Text('Capture a new bill'),
+                      child: const Text('Attach a new receipt'),
                     ),
                   if (receipts.drafts
                           .where(
@@ -706,7 +574,7 @@ class _ReceiptSteps extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    ['Capture', 'Review', 'Split'][index],
+                    ['Attach', 'Details', 'Split'][index],
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: index == current
@@ -954,7 +822,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
       }
       if (expense == null && payer != g.participant(c.userId)) {
         throw ApiFailure(
-          'The payer must confirm this scanned bill from their own account.',
+          'The payer must confirm this receipt from their own account.',
         );
       }
       if (preview!['requiresDifferenceAcknowledgement'] == true &&
@@ -1118,7 +986,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'AI can misread a bill. Check the image, amounts, and people before confirming.',
+                    'Check the receipt, amounts, and people before confirming.',
                   ),
                 ),
               ],
@@ -1289,7 +1157,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
           ...items.asMap().entries.map((entry) {
             final item = entry.value;
             final low =
-                item['confidence'] == null || (item['confidence'] as num) < .8;
+                item['confidence'] != null && (item['confidence'] as num) < .8;
             final assigned = (item['assigneeIds'] as List? ?? [])
                 .cast<String>();
             return Card(
@@ -1366,7 +1234,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
                   '${entry.value['name']} · ${money(entry.value['amountPaise'] ?? 0)}',
                 ),
                 subtitle: Text(
-                  '${entry.value['confidence'] == null || (entry.value['confidence'] as num) < .8 ? 'Check this reading · ' : ''}${entry.value['includedInItemPrices'] == true
+                  '${entry.value['confidence'] != null && (entry.value['confidence'] as num) < .8 ? 'Check this reading · ' : ''}${entry.value['includedInItemPrices'] == true
                       ? 'Already included in item prices'
                       : object(entry.value['weights']).isEmpty
                       ? 'Proportional to each person’s items'
@@ -1404,7 +1272,7 @@ class _ReceiptReviewPageState extends State<ReceiptReviewPage>
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'The selected payer must confirm a scanned expense from their own account.',
+                'The selected payer must confirm an expense with a receipt from their own account.',
                 style: TextStyle(color: clay),
               ),
             ),

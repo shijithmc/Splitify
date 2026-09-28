@@ -1,3 +1,5 @@
+> Historical design: AI bill scanning was removed on 28 September 2026. Manual receipt attachments remain. See [current receipt contract](api/receipts-contract.md).
+
 # Feature Name
 **Snap & Split: AI Bill Scanning with Shared Receipts**
 

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hisaab/core/controller.dart';
 import 'package:hisaab/core/design.dart';
 import 'package:hisaab/core/native_services.dart';
-import 'package:hisaab/core/receipts.dart';
 import 'package:hisaab/features/settings.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,28 +19,6 @@ class AnnualPriceBilling extends BillingService {
       PresentedOfferingContext('main', null, null),
     ),
   ];
-}
-
-class AccountTestController extends AppController {
-  ReceiptCoordinator? allowanceOverride;
-  @override
-  ReceiptCoordinator get receipts => allowanceOverride ?? super.receipts;
-}
-
-class KnownAllowance extends ReceiptCoordinator {
-  KnownAllowance(AppController controller)
-    : super(
-        repository: controller.repository!,
-        account: controller.userId,
-        current: () => true,
-        foreground: () => true,
-      ) {
-    allowance = {'remaining': 42, 'cap': 100};
-  }
-  @override
-  Future<void> initialize() async {}
-  @override
-  Future<void> refreshAllowance() async {}
 }
 
 Future<void> showPlan(WidgetTester tester, AppController controller) async {
@@ -88,7 +65,9 @@ void main() {
     expect(find.text('Store verification pending'), findsOneWidget);
     expect(find.text('Ad-free is active'), findsNothing);
     expect(
-      find.textContaining('Your scan allowance updates after verification.'),
+      find.textContaining(
+        'Ads are paused while your store purchase is verified.',
+      ),
       findsOneWidget,
     );
     await tester.pumpWidget(const SizedBox.shrink());
@@ -96,7 +75,7 @@ void main() {
   });
 
   testWidgets(
-    'settings uses actual allowance and remains usable with large text',
+    'settings has no scan allowance and remains usable with large text',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -105,11 +84,9 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       SharedPreferences.setMockInitialValues({});
-      final controller = AccountTestController();
+      final controller = AppController();
       await controller.startDemo();
       controller.user['displayName'] = '';
-      final allowance = KnownAllowance(controller);
-      controller.allowanceOverride = allowance;
       await tester.pumpWidget(
         MaterialApp(
           theme: HisaabTheme.light,
@@ -117,12 +94,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('42 of 100 scans left'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('42 of 100 scans left'), findsOneWidget);
+      expect(find.textContaining('scans left'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('Receipt details on lock screen'),
         250,
@@ -140,7 +112,6 @@ void main() {
       expect(find.text('Reset demo data'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
-      allowance.dispose();
       controller.dispose();
     },
   );

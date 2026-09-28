@@ -80,7 +80,6 @@ public sealed class Function
         builder.Services.AddSingleton<ReceiptAccess>();
         builder.Services.AddSingleton<ReceiptDocuments>();
         builder.Services.AddSingleton<ReceiptQuotaService>();
-        builder.Services.AddSingleton<ReceiptBudgetService>();
         builder.Services.AddSingleton<ReceiptLifecycle>();
         builder.Services.AddSingleton<ReceiptAttachmentService>();
         builder.Services.AddSingleton<ReceiptService>();

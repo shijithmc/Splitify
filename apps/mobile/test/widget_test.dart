@@ -52,13 +52,15 @@ void main() {
       controller.receiptOverride = receipts;
       await tester.pumpWidget(HisaabApp(controller: controller));
       await tester.scrollUntilVisible(
-        find.text('Scan bill'),
+        find.text('Attach receipt'),
         150,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.ensureVisible(find.widgetWithText(TextButton, 'Scan bill'));
+      await tester.ensureVisible(
+        find.widgetWithText(TextButton, 'Attach receipt'),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Scan bill'));
+      await tester.tap(find.text('Attach receipt'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ListTile, 'Goa, here we come'));
       await tester.pumpAndSettle();

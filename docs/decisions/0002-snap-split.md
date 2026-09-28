@@ -1,3 +1,5 @@
+> Historical design: AI bill scanning was removed on 28 September 2026. Manual receipt attachments remain. See [current receipt contract](../api/receipts-contract.md).
+
 # ADR 0002: Snap & Split implementation defaults
 
 Accepted for source implementation, 26 September 2026, following the user's instruction to implement the reviewed plan. External release gates remain open.

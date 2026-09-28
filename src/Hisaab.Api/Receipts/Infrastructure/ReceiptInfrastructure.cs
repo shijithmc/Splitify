@@ -10,10 +10,7 @@ public static class ReceiptInfrastructure
 {
     public static IServiceCollection AddReceiptInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        services.AddHttpClient("receipt-vertex", client => client.Timeout = TimeSpan.FromSeconds(21));
         if (environment.IsDevelopment()) services.AddHostedService<LocalReceiptWorker>();
-        services.TryAddSingleton<IVertexAccessToken, WorkloadIdentityToken>();
-        services.TryAddSingleton<IReceiptExtractor, VertexReceiptExtractor>();
         services.TryAddSingleton<IReceiptBlobStore>(provider =>
         {
             if (!string.IsNullOrWhiteSpace(configuration["Hisaab:Receipts:BucketName"]))
