@@ -6,7 +6,7 @@ using Hisaab.Application.Storage;
 using Hisaab.Domain;
 namespace Hisaab.Api.Identity;
 
-public sealed class IdentityService(IAtomicStore store, IProviderVerifier verifier, AppleTokens apple, BillingService billing, IConfiguration configuration, IHostEnvironment environment)
+public sealed class IdentityService(IAtomicStore store, IProviderVerifier verifier, AppleTokens apple, BillingService billing, IConfiguration configuration, IHostEnvironment environment, PhoneOtpService phone)
 {
     public async Task<object> ChallengeAsync(CancellationToken ct = default)
     {
@@ -24,7 +24,8 @@ public sealed class IdentityService(IAtomicStore store, IProviderVerifier verifi
     public async Task<SessionResult> SignInAsync(SignInRequest request, CancellationToken ct = default)
     {
         var challenge = await ChallengeRowAsync(request.Nonce, ct);
-        var identity = await verifier.VerifyAsync(request, ct);
+        var proof = await VerifyAsync(request, challenge, "sign-in", null, ct);
+        var identity = proof.Identity; challenge = proof.Challenge;
         var pk = IdentityKey(identity.Provider, identity.Subject);
         var row = await store.GetAsync(pk, "OWNER", ct);
         var writes = new List<StoreMutation> { StoreMutation.Delete(challenge.Pk, challenge.Sk, challenge.Version) };
@@ -33,7 +34,8 @@ public sealed class IdentityService(IAtomicStore store, IProviderVerifier verifi
         {
             var known = row.Deserialize<ProviderIdentity>(); var account = await store.GetAsync($"USER#{known.UserId}", "PROFILE", ct);
             if (account is null || account.Deserialize<UserAccount>().Status != "active") throw new DomainException(401, "account_unavailable", "This account is unavailable.");
-            user = account.Deserialize<UserAccount>() with { Email = identity.Email };
+            user = account.Deserialize<UserAccount>();
+            if (identity.Provider != "phone") user = user with { Email = identity.Email };
             writes.Add(StoreMutation.Put(StoreRow.Create(account.Pk, account.Sk, account.Version + 1, user), account.Version));
             var updated = known with { Email = identity.Email, Audience = identity.Audience };
             if (identity.Provider == "apple")
@@ -67,10 +69,16 @@ public sealed class IdentityService(IAtomicStore store, IProviderVerifier verifi
     public async Task<UserAccount> LinkAsync(Actor actor, SignInRequest request, CancellationToken ct = default)
     {
         Recent(actor);
-        var challenge = await ChallengeRowAsync(request.Nonce, ct); var verified = await verifier.VerifyAsync(request, ct); var pk = IdentityKey(verified.Provider, verified.Subject);
+        var challenge = await ChallengeRowAsync(request.Nonce, ct);
+        var proof = await VerifyAsync(request, challenge, "link", actor, ct);
+        var verified = proof.Identity; challenge = proof.Challenge; var pk = IdentityKey(verified.Provider, verified.Subject);
         var existing = await store.GetAsync(pk, "OWNER", ct);
         if (existing is not null && existing.Deserialize<ProviderIdentity>().UserId != actor.User.Id) throw new DomainException(409, "account_merge_required", "This sign-in belongs to another Hisaab account. Contact support to preserve both accounts' records.");
-        if (existing is not null) return actor.User;
+        if (existing is not null)
+        {
+            await store.TransactAsync([StoreMutation.Condition($"USER#{actor.User.Id}", "PROFILE", actor.AccountVersion), StoreMutation.Delete(challenge.Pk, challenge.Sk, challenge.Version)], ct);
+            return actor.User;
+        }
         var refresh = verified.Provider == "apple" ? await apple.ExchangeAsync(request.AuthorizationCode ?? "", verified.Audience, verified.Subject, request.Nonce, ct) : null;
         var session = await store.GetAsync($"SESSION#{actor.SessionHash}", "META", ct) ?? throw new DomainException(401, "session_invalid", "Sign in again.");
         var linkedSession = session.Deserialize<SessionRecord>() with { VerifiedInviteEmail = verified.AuthoritativeEmail ? verified.Email : null };
@@ -88,6 +96,33 @@ public sealed class IdentityService(IAtomicStore store, IProviderVerifier verifi
         }
         await store.TransactAsync(linkWrites, ct);
         return actor.User;
+    }
+    public async Task<SessionResult> ReauthenticatePhoneAsync(Actor actor, PhoneReauthenticationRequest request, CancellationToken ct = default)
+    {
+        var challenge = await ChallengeRowAsync(request.Nonce, ct);
+        var proof = await phone.VerifyAsync(challenge, request.Code, "reauthenticate", actor, ct);
+        var owner = await store.GetAsync(IdentityKey("phone", proof.Identity.Subject), "OWNER", ct);
+        if (owner?.Deserialize<ProviderIdentity>().UserId != actor.User.Id) throw new DomainException(401, "phone_code_invalid", "Use the phone number linked to this account.");
+        var session = await store.GetAsync($"SESSION#{actor.SessionHash}", "META", ct) ?? throw new DomainException(401, "session_invalid", "Sign in again.");
+        var data = session.Deserialize<SessionRecord>();
+        var refresh = await store.GetAsync($"REFRESH#{data.RefreshHash}", "META", ct);
+        var index = await store.GetAsync($"USER#{actor.User.Id}", $"SESSION#{actor.SessionHash}", ct);
+        var writes = new List<StoreMutation> {
+            StoreMutation.Condition($"USER#{actor.User.Id}", "PROFILE", actor.AccountVersion),
+            StoreMutation.Condition(owner.Pk, owner.Sk, owner.Version),
+            StoreMutation.Delete(proof.Challenge.Pk, proof.Challenge.Sk, proof.Challenge.Version),
+            StoreMutation.Delete(session.Pk, session.Sk, session.Version)
+        };
+        if (refresh is not null) writes.Add(StoreMutation.Delete(refresh.Pk, refresh.Sk, refresh.Version));
+        if (index is not null) writes.Add(StoreMutation.Delete(index.Pk, index.Sk, index.Version));
+        try { return await CreateSessionAsync(actor.User, writes, ct, previousSessionHash: actor.SessionHash); }
+        catch (StoreConflictException) { throw new DomainException(409, "sign_in_retry", "This sign-in was already used or the account changed. Start sign-in again."); }
+    }
+    private async Task<PhoneVerification> VerifyAsync(SignInRequest request, StoreRow challenge, string purpose, Actor? actor, CancellationToken ct)
+    {
+        if (request.Provider == "phone") return await phone.VerifyAsync(challenge, request.IdToken, purpose, actor, ct);
+        if (PhoneOtpService.IsPhoneChallenge(challenge)) throw new DomainException(401, "challenge_invalid", "Start sign-in again.");
+        return new(await verifier.VerifyAsync(request, ct), challenge);
     }
     public async Task<Actor> AuthenticateAsync(string token, CancellationToken ct = default)
     {

@@ -16,7 +16,6 @@ class ReceiptCoordinator extends ChangeNotifier {
   final bool Function() foreground;
   final ReceiptDraftStore store;
   final List<Json> drafts = [];
-  Json allowance = {};
   double? uploadProgress;
   String? notice;
   Timer? _timer;
@@ -55,6 +54,24 @@ class ReceiptCoordinator extends ChangeNotifier {
       if (expired && draft['status'] != 'attached') {
         await store.remove(draft);
       } else {
+        // Retain the photos, reviewed amounts and receipt identity while
+        // replacing legacy scan commands with manual attachment commands.
+        if (draft['scanRequested'] != false) {
+          draft['scanRequested'] = false;
+          draft['createKey'] = const Uuid().v4();
+          draft['completeKey'] = const Uuid().v4();
+          draft.remove('completeVersion');
+          if (draft['status'] == 'queued_upload') {
+            draft['needsManualResume'] = true;
+          }
+          draft.remove('consentIntent');
+          draft.remove('consentKey');
+          draft.remove('retryKey');
+          draft.remove('retryVersion');
+          draft.remove('demoCounted');
+          await store.save(draft);
+          _check();
+        }
         drafts.add(draft);
       }
     }
@@ -62,12 +79,6 @@ class ReceiptCoordinator extends ChangeNotifier {
       if (active && foreground()) unawaited(pump());
     });
     _notify();
-    try {
-      await refreshAllowance();
-    } catch (_) {
-      notice =
-          'Offline capture is ready. Connect to upload and read your bill.';
-    }
     unawaited(pump());
   }();
   Future<Json> request(
@@ -87,37 +98,6 @@ class ReceiptCoordinator extends ChangeNotifier {
         : await repository.request(method, path, data);
     _check();
     return result;
-  }
-
-  Future<void> refreshAllowance() async {
-    if (demo) {
-      final used = drafts.where((d) => d['demoCounted'] == true).length;
-      allowance = {
-        'plan': 'free',
-        'cap': 5,
-        'used': used,
-        'reserved': 0,
-        'remaining': (5 - used).clamp(0, 5),
-        'scanAvailable': used < 5,
-        'consentVersion': 'receipt-ai-v1',
-        'consentAccepted': true,
-        'reason': used >= 5 ? 'scan_limit_reached' : null,
-      };
-    } else {
-      allowance = await request('GET', '/receipts/allowance');
-    }
-    _notify();
-  }
-
-  Future<void> acceptConsent() async {
-    if (!demo) {
-      await request('PUT', '/receipts/consent', {
-        'version': allowance['consentVersion'] ?? '2026-09-26-v1',
-        'accepted': true,
-      });
-    }
-    allowance['consentAccepted'] = true;
-    _notify();
   }
 
   Future<Json> create(String groupId) async {
@@ -164,20 +144,12 @@ class ReceiptCoordinator extends ChangeNotifier {
     await persist(draft);
   }
 
-  Future<void> queue(Json draft, {required bool scan}) async {
+  Future<void> queue(Json draft) async {
     _check();
     if (rows(draft['images']).isEmpty) {
       throw ApiFailure('Add a photo or a PDF first.');
     }
-    if (scan &&
-        allowance['consentAccepted'] != true &&
-        draft['consentIntent'] == null) {
-      throw ApiFailure('Accept the Google processing notice before scanning.');
-    }
-    draft['scanRequested'] = scan;
-    if (draft['consentIntent'] != null) {
-      draft['consentKey'] ??= const Uuid().v4();
-    }
+    draft['scanRequested'] = false;
     draft['status'] = 'queued_upload';
     draft.remove('error');
     await persist(draft);
@@ -229,17 +201,6 @@ class ReceiptCoordinator extends ChangeNotifier {
               draft['images'] = <Json>[];
             }
             await persist(draft);
-            if ([
-              'ready',
-              'manual_ready',
-              'failed',
-              'unreadable',
-              'not_bill',
-            ].contains(state)) {
-              try {
-                await refreshAllowance();
-              } catch (_) {}
-            }
           }
         } catch (error) {
           if (!active) break;
@@ -267,25 +228,34 @@ class ReceiptCoordinator extends ChangeNotifier {
       };
       draft['review'] ??= emptyReceiptReview();
       notice =
-          'Local demo: enter this photo manually, or use the sample bill. No AI service is called.';
+          'Local demo: enter the amounts from your photo, or use the sample bill.';
       await persist(draft);
       return;
     }
-    if (draft['scanRequested'] == true && draft['consentIntent'] != null) {
-      await request('PUT', '/receipts/consent', {
-        'version': draft['consentIntent'],
-        'accepted': true,
-      }, draft['consentKey'] ??= const Uuid().v4());
-      allowance['consentAccepted'] = true;
+    if (draft['needsManualResume'] == true &&
+        await _resumeMigratedReceipt(draft)) {
+      return;
     }
     // Replaying create refreshes upload grants without creating a second receipt.
-    final created =
-        await request('POST', '/groups/${draft['groupId']}/receipts', {
-          'id': draft['id'],
-          'scanRequested': draft['scanRequested'],
-          'images': draft['images'],
-        }, draft['createKey']);
+    final Json created;
+    try {
+      created = await request('POST', '/groups/${draft['groupId']}/receipts', {
+        'id': draft['id'],
+        'scanRequested': false,
+        'images': draft['images'],
+      }, draft['createKey']);
+    } on ApiFailure catch (error) {
+      // The worker can finish the legacy upload after the preflight read.
+      if (draft['needsManualResume'] == true &&
+          error.status == 409 &&
+          error.code == 'receipt_exists' &&
+          await _resumeMigratedReceipt(draft)) {
+        return;
+      }
+      rethrow;
+    }
     draft['server'] = object(created['receipt']);
+    draft.remove('needsManualResume');
     await persist(draft);
     final uploads = rows(created['uploads']);
     for (var i = 0; i < uploads.length; i++) {
@@ -315,30 +285,25 @@ class ReceiptCoordinator extends ChangeNotifier {
     await persist(draft);
   }
 
-  Future<void> retry(Json draft) async {
-    final status = await get(draft['id']);
-    final key = draft['retryKey'] ??= const Uuid().v4();
-    draft['retryVersion'] ??= status['version'];
-    await persist(draft);
-    Json result;
+  Future<bool> _resumeMigratedReceipt(Json draft) async {
+    final Json existing;
     try {
-      result = await request('POST', '/receipts/${draft['id']}/retry', {
-        'version': draft['retryVersion'],
-      }, key);
+      existing = await get(draft['id']);
     } on ApiFailure catch (error) {
-      if (error.status >= 400 && error.status < 500 && error.status != 401) {
-        draft.remove('retryKey');
-        draft.remove('retryVersion');
-        await persist(draft);
-      }
+      if (error.status == 404) return false;
       rethrow;
     }
-    draft['server'] = {...status, ...result};
+    if (existing['groupId'] != draft['groupId']) {
+      throw ApiFailure('This receipt belongs to another group.');
+    }
+    if (existing['state'] == 'awaiting_upload') return false;
+    // An older app may have sealed the upload before its response was lost.
+    // Resume its saved receipt without submitting another create command.
+    draft['server'] = existing;
     draft['status'] = 'processing';
-    draft.remove('retryKey');
-    draft.remove('retryVersion');
+    draft.remove('needsManualResume');
     await persist(draft);
-    unawaited(pump());
+    return true;
   }
 
   Future<Json> preview(Json draft) async {
@@ -475,7 +440,7 @@ class ReceiptCoordinator extends ChangeNotifier {
       'SGST                  20.50',
       'TOTAL                861.00',
       '',
-      'Sample only - no AI call',
+      'Sample receipt',
     ];
     for (var i = 0; i < lines.length; i++) {
       img.drawString(
@@ -511,7 +476,6 @@ class ReceiptCoordinator extends ChangeNotifier {
             'lineTotalPaise': item.$2,
             'assigneeIds': participants,
             'ignored': false,
-            'confidence': item.$1 == 'Lime soda' ? .6 : .98,
           },
       ],
       'charges': [
@@ -526,7 +490,6 @@ class ReceiptCoordinator extends ChangeNotifier {
       ],
     };
     draft['status'] = 'ready';
-    draft['demoCounted'] = true;
     draft['server'] = {
       'id': draft['id'],
       'groupId': groupId,
@@ -535,7 +498,6 @@ class ReceiptCoordinator extends ChangeNotifier {
       'media': draft['images'],
     };
     await persist(draft);
-    await refreshAllowance();
     return draft;
   }
 

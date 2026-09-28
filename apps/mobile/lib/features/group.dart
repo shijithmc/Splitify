@@ -236,11 +236,8 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                                   await load();
                                   await c.refresh();
                                 },
-                          icon: const Icon(
-                            Icons.document_scanner_outlined,
-                            size: 18,
-                          ),
-                          label: const Text('Scan bill'),
+                          icon: const Icon(Icons.attach_file_rounded, size: 18),
+                          label: const Text('Attach receipt'),
                         ),
                       OutlinedButton.icon(
                         onPressed: group!.archived || c.offline
@@ -1025,7 +1022,9 @@ class _SettlementPageState extends State<SettlementPage> {
   void initState() {
     super.initState();
     final me = g.participant(widget.controller.userId);
-    final incoming = payers.where((m) => (g.pairs(m.id)[me] ?? 0) < 0).firstOrNull;
+    final incoming = payers
+        .where((m) => (g.pairs(m.id)[me] ?? 0) < 0)
+        .firstOrNull;
     if (me != null && payers.any((m) => m.id == me)) {
       selectPayer(me);
     } else if (incoming != null) {

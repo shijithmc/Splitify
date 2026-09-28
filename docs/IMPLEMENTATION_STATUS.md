@@ -1,12 +1,18 @@
 # Implementation status
 
-Updated 26 September 2026. Source implementation follows the accepted defaults in ADR 0001. The original plan remains a historical design/acceptance document; it is not a claim that external release gates passed.
+Updated 28 September 2026. Source implementation follows the accepted defaults in ADR 0001. The original plan remains a historical design/acceptance document; it is not a claim that external release gates passed.
+
+## AI scanning removal — 28 September 2026
+
+AI bill scanning, scan allowance/consent/retry controls, provider integration and evaluation tooling have been removed. Manual receipt photos, entered items/totals, split review, existing receipts and private media retention remain. Legacy scan requests return 410 and queued work is handled without inference. General API limits and stricter receipt upload limits remain. Earlier dated verification and feature descriptions below are historical records, superseded by this removal and the [current receipt contract](api/receipts-contract.md).
+
+Removal verification: 286 .NET tests (171 API, 81 domain, 23 infrastructure, 11 support), 87 default Flutter tests plus four explicit ad-policy tests, clean Flutter analysis, and Linux ARM64 API/worker publishing. Regression coverage includes rejected legacy scans, pending scan conversion, preserved historical receipts, interrupted mobile uploads and manual upload limits.
 
 ## Delivered source
 
 | Area | Implemented behavior | Evidence / limit |
 |---|---|---|
-| Identity | Google/Apple token validation, Apple Android callback, fresh challenges, explicit credential linking, account-scoped sessions and rotating refresh credentials | API security tests; native adapters compile. Real provider acceptance needs registered OAuth/app/service IDs. |
+| Identity | Google/Apple token validation, Twilio Verify phone OTP, Apple Android callback, fresh challenges, explicit credential linking, account-scoped sessions and rotating refresh credentials | API security tests; native adapters compile. Real provider acceptance needs registered OAuth/app/service IDs, configured SMS delivery and signed devices. |
 | Groups/invites | Home/Trip/Couple/Other and hidden Direct groups; placeholders; encrypted optional contact data; seven-day scoped links; explicit link/verified-email claims; archive, leave and creator deletion rules | Group/API tests. Typed phone is an address, never proof of ownership; recipients claim through the shared link. Contact-email discovery requires fresh authoritative provider proof. |
 | Ledger | Four split modes, deterministic integer-paise rounding, exact-gap errors, single payer, optimistic revisions, atomic expense/balance/event writes, 30-day restore and once-only dispute reversal | Domain property tests and HTTP journey tests, including concurrent writers and request replay. |
 | Mobile | Onboarding/demo, groups/friends, expense/settlement flows, settings/linking/deletion, secure per-account cache, offline write lock, foreground refresh | Analyzer/widget/repository tests, Android debug build and iOS simulator build/launch. Production signing/device acceptance remains. |
@@ -50,12 +56,12 @@ Capture limits: edge detection is a bounded rectangular estimate with explicit c
 
 **Still gated:** live Mumbai Vertex/WIF/token renewal, 200+ permissioned real-bill evaluation, production IAM/load/latency, billing reconciliation, physical-device camera/crop/HEIC/PDF/accessibility and signed push/store journeys. Scanning remains off by default. Flutter 3.44.6 already sets the effective Android minSdk to 24 (the existing maxOf expression is preserved). The original Android 23 support claim therefore needs a separately validated toolchain. Native HEIC works only on Android 28+ or iOS; older Android HEIC acceptance remains unresolved. Raw support diagnostics and production correction/conversion analytics are not implemented. Per-unit allocation and background OS upload jobs remain deferred as recorded in ADR 0002.
 
-See [receipt contract](api/receipts-contract.md), [operations](runbooks/receipts.md), [accepted implementation defaults](decisions/0002-snap-split.md) and [evaluation harness](../tools/Hisaab.ReceiptEval/README.md). No cloud deployment or real AI benchmark ran in this implementation.
+See [receipt contract](api/receipts-contract.md), [operations](runbooks/receipts.md), [accepted implementation defaults](decisions/0002-snap-split.md). No cloud deployment or real AI benchmark ran in this implementation.
 
 ## Release gates
 
 1. Supply the AWS account/profile/region, environment/domain strategy and budget. Configure a high-entropy encryption key/contact HMAC key and provider secrets through an existing Secrets Manager secret. Deploy only through a reviewed environment process; SnapStart, OpenSearch and WAF remain prohibited.
-2. Register final iOS/Android identifiers, signing credentials and Google/Apple OAuth audiences. Verify Apple private relay, Android callback/state and both-credential linking on physical devices. Configure universal/app-link associations on the invite host.
+2. Register final iOS/Android identifiers, signing credentials and Google/Apple OAuth audiences. Configure Twilio Verify, country permissions, backend SMS secrets and send budgets. Verify Apple private relay, Android callback/state, real SMS delivery and both-credential linking on physical devices. Configure universal/app-link associations on the invite host.
 3. Configure RevenueCat `ad_free`, annual products at the intended India price, explicit restore/transfer policy, store notifications, test users and merchant accounts. Verify purchase, interrupted verification, reinstall, wrong-account restore, refund/revoke, billing grace and cross-store entitlement. SDK responses alone never grant server premium.
 4. Configure Firebase/APNs and AdMob. Test push permissions, muted types, token refresh, logout, consent, no-fill and ad disposal. Ads remain disabled until age/audience/consent policy is reviewed; current requests are non-personalized with conservative age treatment and no app-supplied PII.
 5. Publish reviewed Terms, Privacy and account-deletion/help pages; set support/grievance contacts and retention policy. Verify legal URLs on the paywall and independent store-subscription cancellation guidance during deletion.
@@ -78,3 +84,9 @@ New widget coverage checks narrow displays, large text, payer/split controls, li
 Apple Android code exchange now includes the registered callback URL for the configured Services ID; native iOS code exchange omits it. Google and Apple ID-token audiences require exact matches. New offline tests exercise the production verifier using signed JWTs and discovery/JWKS responses, alongside the Apple exchange and session tests. These checks do not use live provider accounts.
 
 Flutter sign-in handles cancellation without displaying provider diagnostics, prevents overlapping requests, initializes the Google SDK once, and protects reauthentication/linking against account changes. Provider registration, signing, API deployment and real-account acceptance remain pending; use the [authentication runbook](runbooks/authentication.md) for the matching client/server configuration and acceptance checklist.
+
+## Phone OTP — 28 September 2026
+
+Added phone sign-in alongside Google and Apple, with server-side Twilio Verify SMS proof, challenge expiry and bounded attempts. Linking and account-deletion reauthentication use purpose-bound challenges tied to the current account. Existing accounts are not merged and phone sign-in does not automatically claim invitations. Phone flows use the existing account sessions and secure mobile storage.
+
+Phone authentication defaults to disabled. No Twilio service or credentials were provisioned, no SMS was sent and no cloud deployment was performed for this change. Configured secrets, supported-country delivery, abuse/cost settings and signed-device SMS acceptance remain pending. The [authentication runbook](runbooks/authentication.md#configure-phone-otp) records the required configuration and acceptance cases; the [API contract](api/implementation-contract.md) records the public endpoints.

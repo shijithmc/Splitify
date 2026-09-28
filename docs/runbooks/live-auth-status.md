@@ -2,6 +2,8 @@
 
 Updated 27 September 2026. The physical iPhone build uses source commit `f0cb18e`; application code is unchanged from the deployed backend and simulator source `765ba5d`. This records environment setup separately from observed sign-in results. **Real-account authentication acceptance is pending.** Installation, provider registration and API health checks do not establish a successful native login.
 
+Phone-OTP source was added on 28 September 2026 after the environment observations below. This change does not establish a Twilio account/service, populate backend secrets, deploy the new API or send a real SMS. Phone authentication remains disabled by default; configured delivery and signed-device acceptance are **pending**. Follow [phone setup](authentication.md#configure-phone-otp) before recording a phone login result.
+
 ## Environment and registrations
 
 | Surface | Public identifier | Status |

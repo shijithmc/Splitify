@@ -5,11 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/config.dart';
 import '../core/controller.dart';
 import '../core/design.dart';
-import '../core/receipts.dart';
 import '../core/models.dart';
+import '../core/native_services.dart';
+import '../core/phone_auth.dart';
 import '../core/repository.dart';
 import '../main.dart';
 import 'shared.dart';
+import 'phone_sign_in.dart';
 
 Future<void> openLink(BuildContext context, String url) async {
   if (url.isEmpty) {
@@ -127,10 +129,6 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (c.signedIn) ...[
-                  const SizedBox(height: 20),
-                  _ScanAllowance(controller: c),
-                ],
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -301,21 +299,62 @@ class SettingsPage extends StatelessWidget {
           !identical(c.repository, repo)) {
         throw ApiFailure('Account changed. Start linking again from Settings.');
       }
-      await c.identity.reauthenticate(repo, currentProvider, account);
+      await _reauthenticate(context, repo, currentProvider, account);
       if (c.userId != account || !identical(c.repository, repo)) {
         throw ApiFailure('Account changed. Start linking again from Settings.');
       }
-      final proof = await c.identity.credential(repo, provider);
-      if (c.userId != account || !identical(c.repository, repo)) {
-        throw ApiFailure('Account changed. Start linking again from Settings.');
+      if (!context.mounted) return;
+      if (provider == 'phone') {
+        await _phoneVerification(context, repo, PhoneAuthPurpose.link, account);
+      } else {
+        final proof = await c.identity.credential(repo, provider);
+        if (c.userId != account || !identical(c.repository, repo)) {
+          throw ApiFailure(
+            'Account changed. Start linking again from Settings.',
+          );
+        }
+        await repo.request('POST', '/auth/link', proof);
       }
-      await repo.request('POST', '/auth/link', proof);
       await c.refresh();
       if (context.mounted) {
         message(context, 'Sign-in method linked to this account.');
       }
     });
   }
+
+  Future<void> _phoneVerification(
+    BuildContext context,
+    ApiRepository repo,
+    PhoneAuthPurpose purpose,
+    String account,
+  ) async {
+    final result = await openPage<Json>(
+      context,
+      c,
+      PhoneSignInPage(
+        service: PhoneAuthService(
+          repo,
+          purpose: purpose,
+          isCurrent: () => c.userId == account && identical(c.repository, repo),
+        ),
+      ),
+    );
+    if (result == null) throw IdentityCancelled();
+  }
+
+  Future<void> _reauthenticate(
+    BuildContext context,
+    ApiRepository repo,
+    String provider,
+    String account,
+  ) => provider == 'phone'
+      ? _phoneVerification(
+          context,
+          repo,
+          PhoneAuthPurpose.reauthenticate,
+          account,
+        )
+      : c.identity.reauthenticate(repo, provider, account);
 
   Future<void> deleteAccount(BuildContext context) async {
     final confirmDelete = await showDialog<bool>(
@@ -373,7 +412,8 @@ class SettingsPage extends StatelessWidget {
     }
     await act(context, () async {
       if (provider != null) {
-        await c.identity.reauthenticate(
+        await _reauthenticate(
+          context,
           repo as ApiRepository,
           provider,
           account,
@@ -484,7 +524,7 @@ class _PremiumPageState extends State<PremiumPage> {
                   ? c.entitlement['expiresAt'] == null
                         ? 'Your account’s ad-free access is active.'
                         : 'Access until ${c.entitlement['expiresAt'].toString().split('T').first}.'
-                  : 'Ads are paused while your store purchase is verified. Your scan allowance updates after verification.',
+                  : 'Ads are paused while your store purchase is verified.',
             ),
           ],
           const SizedBox(height: 20),
@@ -509,18 +549,13 @@ class _PremiumPageState extends State<PremiumPage> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'For regular bill scanners',
+                    'For an ad-free experience',
                     style: TextStyle(color: HisaabColors.muted),
                   ),
                   const SizedBox(height: 20),
                   const _PlanBenefit(
                     icon: Icons.block_outlined,
                     title: 'No banner ads',
-                  ),
-                  const _PlanBenefit(
-                    icon: Icons.document_scanner_outlined,
-                    title: '100 successful scans / month',
-                    subtitle: 'Resets on the first of the month, IST.',
                   ),
                   const _PlanBenefit(
                     icon: Icons.devices_outlined,
@@ -621,7 +656,7 @@ class _PremiumPageState extends State<PremiumPage> {
             color: HisaabColors.mint,
             title: 'Everyday sharing stays free',
             body:
-                'Manual expense splitting and 5 successful bill scans each month are included on the free plan.',
+                'Expense splitting and receipt attachments are included on the free plan.',
           ),
           const SizedBox(height: 16),
           if (busy)
@@ -854,8 +889,7 @@ class _AccountNotice extends StatelessWidget {
 class _PlanBenefit extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String? subtitle;
-  const _PlanBenefit({required this.icon, required this.title, this.subtitle});
+  const _PlanBenefit({required this.icon, required this.title});
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -871,17 +905,6 @@ class _PlanBenefit extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-              if (subtitle != null) ...[
-                const SizedBox(height: 5),
-                Text(
-                  subtitle!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: HisaabColors.muted,
-                    height: 1.5,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -908,107 +931,6 @@ class _PremiumIllustration extends StatelessWidget {
         size: 32,
       ),
     ),
-  );
-}
-
-class _ScanAllowance extends StatefulWidget {
-  final AppController controller;
-  const _ScanAllowance({required this.controller});
-  @override
-  State<_ScanAllowance> createState() => _ScanAllowanceState();
-}
-
-class _ScanAllowanceState extends State<_ScanAllowance> {
-  late final ReceiptCoordinator receipts = widget.controller.receipts;
-  bool loading = true;
-  String? error;
-  @override
-  void initState() {
-    super.initState();
-    load();
-  }
-
-  Future<void> load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
-    try {
-      await receipts.initialize();
-      await receipts.refreshAllowance();
-    } catch (_) {
-      if (mounted) error = 'Connect to check your current scan allowance.';
-    }
-    if (mounted) setState(() => loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: receipts,
-    builder: (context, _) {
-      final remaining = receipts.allowance['remaining'];
-      final cap = receipts.allowance['cap'];
-      if (loading) {
-        return const Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Expanded(child: Text('Checking your scan allowance…')),
-          ],
-        );
-      }
-      if (error != null || remaining is! num || cap is! num || cap <= 0) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              error ?? 'Scan allowance is unavailable.',
-              style: const TextStyle(height: 1.5),
-            ),
-            TextButton.icon(
-              onPressed: load,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try again'),
-            ),
-          ],
-        );
-      }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$remaining of $cap scans left',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: (remaining / cap).clamp(0.0, 1.0),
-              minHeight: 7,
-              color: HisaabColors.primary,
-              backgroundColor: Colors.white,
-              semanticsLabel: '$remaining of $cap scans remaining',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.controller.demo
-                ? 'Local demo allowance'
-                : 'Resets on the first of the month, IST.',
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: HisaabColors.muted,
-            ),
-          ),
-        ],
-      );
-    },
   );
 }
 
@@ -1055,6 +977,12 @@ Future<String?> _chooseProvider(
             onPressed: () => Navigator.pop(context, 'apple'),
             icon: const Icon(Icons.apple_rounded),
             label: Text('$action Apple'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(context, 'phone'),
+            icon: const Icon(Icons.phone_outlined),
+            label: Text('$action phone'),
           ),
           const SizedBox(height: 8),
           TextButton(

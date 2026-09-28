@@ -21,14 +21,11 @@ Do not paste lookup output into public tickets. Transaction IDs supplied as argu
 Receipt support commands:
 
 ```sh
-dotnet run --project tools/Hisaab.Support -- lookup-scan TABLE RECEIPT_UUID INC-123 OPERATOR
-dotnet run --project tools/Hisaab.Support -- receipt-control TABLE stop INC-123 OPERATOR --confirm
-dotnet run --project tools/Hisaab.Support -- receipt-control TABLE pause-free INC-123 OPERATOR --confirm
-dotnet run --project tools/Hisaab.Support -- receipt-control TABLE resume INC-123 OPERATOR --confirm
+dotnet run --project tools/Hisaab.Support -- lookup-receipt TABLE RECEIPT_UUID INC-123 OPERATOR
 ```
 
-Every scan lookup, including a miss, writes an audit entry with the ticket/operator. Output includes only state, attempt count, sanitized error code, lease/quota/retention flags and timestamps. It excludes account/group IDs, merchant/items, blob keys, URLs, image bytes and raw provider output. There is no raw-output viewing command or retained failure payload. Support cannot trigger AI or extend quota through these commands.
+Every receipt lookup, including a miss, writes an audit entry with the ticket/operator. Output includes only state, attempt count, sanitized error code, legacy quota/lease flags, retention flags and timestamps. It excludes account/group IDs, merchant/items, blob keys, URLs and image bytes. Existing receipts remain available for troubleshooting after AI scanning is removed.
 
-`stop` prevents new paid and free provider attempts. `pause-free` preserves an existing emergency stop. `resume` clears both dynamic controls; it cannot override deployment-level `EmergencyStop`, provider validation, missing budget configuration, the circuit breaker or the exhausted free budget. Already admitted provider calls can finish; stopping does not promise cancellation of a charge already sent to Google.
+AI evaluation and runtime scan controls have been removed. Receipt lookup cannot requeue work or change receipt state.
 
-Use separate least-privilege roles. Scan lookup needs `dynamodb:GetItem` scoped to `RECEIPT#*` and transactional writes scoped to `SUPPORT_AUDIT`. Runtime control needs `dynamodb:GetItem`/conditional transactional writes for `OPERATIONS` and `SUPPORT_AUDIT`. Neither role needs S3, Google credentials, receipt revision-page queries, user profiles or ledger writes. Restrict the exact table ARN and enforce operator identity through IAM/CloudTrail; the CLI's operator text is only an annotation. Audit access itself is a write and must not be represented as an unaudited read-only tool.
+Receipt lookup needs `dynamodb:GetItem` scoped to `RECEIPT#*` and transactional writes scoped to `SUPPORT_AUDIT`. The role needs no S3, receipt revision-page queries, user profiles or ledger writes. Restrict the exact table ARN and enforce operator identity through IAM/CloudTrail; the CLI's operator text is only an annotation. Audit access itself is a write and must not be represented as an unaudited read-only tool.

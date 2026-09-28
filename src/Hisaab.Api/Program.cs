@@ -29,6 +29,7 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 builder.Services.AddHttpClient().ConfigureHttpClientDefaults(options => options.ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(15)));
+builder.Services.AddHttpClient("phone-otp", client => client.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddSingleton<IAtomicStore>(services =>
 {
     var config = services.GetRequiredService<IConfiguration>(); var env = services.GetRequiredService<IHostEnvironment>(); var table = config["Hisaab:TableName"];
@@ -37,13 +38,15 @@ builder.Services.AddSingleton<IAtomicStore>(services =>
     return new LocalAtomicStore(config["Hisaab:LocalDataPath"] ?? Path.Combine(".local", "hisaab.json"));
 });
 builder.Services.AddSingleton<IProviderVerifier, ProviderVerifier>();
+builder.Services.AddSingleton<IPhoneOtpProvider, PhoneOtpProvider>();
+builder.Services.AddSingleton<PhoneOtpService>();
 builder.Services.AddSingleton<TokenProtector>(); builder.Services.AddSingleton<AppleTokens>();
 builder.Services.AddSingleton<IdentityService>(); builder.Services.AddSingleton<BillingService>();
 builder.Services.AddSingleton<CommandExecutor>(); builder.Services.AddSingleton<LedgerApplication>();
 builder.Services.AddSingleton<AccountDeletionService>(); builder.Services.AddSingleton<BackgroundJobs>();
 builder.Services.AddSingleton<PushService>();
 builder.Services.AddSingleton<ReceiptAccess>(); builder.Services.AddSingleton<ReceiptDocuments>();
-builder.Services.AddSingleton<ReceiptQuotaService>(); builder.Services.AddSingleton<ReceiptBudgetService>();
+builder.Services.AddSingleton<ReceiptQuotaService>();
 builder.Services.AddSingleton<ReceiptAttachmentService>(); builder.Services.AddSingleton<ReceiptService>();
 builder.Services.AddSingleton<ReceiptLifecycle>(); builder.Services.AddSingleton<ReceiptWorker>();
 builder.Services.AddReceiptInfrastructure(builder.Configuration, builder.Environment);
@@ -57,13 +60,13 @@ app.UseRouting();
 app.Use(async (ctx, next) =>
 {
     try { await next(); }
-    catch (DomainException ex) { ctx.Response.StatusCode = ex.Status; await ctx.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message, correlationId = ctx.TraceIdentifier }); }
+    catch (DomainException ex) { ctx.Response.StatusCode = ex.Status; if (ex.Status == 429) { ctx.Response.Headers.RetryAfter = (ex.RetryAfterSeconds ?? 60).ToString(System.Globalization.CultureInfo.InvariantCulture); ctx.Response.Headers.CacheControl = "no-store"; } await ctx.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message, correlationId = ctx.TraceIdentifier }); }
     catch (StoreConflictException) { ctx.Response.StatusCode = 409; await ctx.Response.WriteAsJsonAsync(new { code = "concurrent_change", message = "This record changed. Refresh and try again.", correlationId = ctx.TraceIdentifier }); }
     catch (StoreValidationException) { ctx.Response.StatusCode = 422; await ctx.Response.WriteAsJsonAsync(new { code = "transaction_invalid", message = "This change exceeds a supported limit.", correlationId = ctx.TraceIdentifier }); }
     catch (BadHttpRequestException ex) { ctx.Response.StatusCode = ex.StatusCode; await ctx.Response.WriteAsJsonAsync(new { code = "request_invalid", message = "Check the request fields.", correlationId = ctx.TraceIdentifier }); }
     catch (Exception ex) { app.Logger.LogError("Request failed with {ErrorType}; correlation {CorrelationId}", ex.GetType().Name, ctx.TraceIdentifier); ctx.Response.StatusCode = 500; await ctx.Response.WriteAsJsonAsync(new { code = "server_error", message = "Something went wrong. Please retry.", correlationId = ctx.TraceIdentifier }); }
 });
-var publicPaths = new HashSet<string>(StringComparer.Ordinal) { "/v1/auth/dev", "/v1/auth/challenge", "/v1/auth/sign-in", "/v1/auth/refresh", "/v1/auth/apple/callback", "/v1/billing/webhook", "/health" };
+var publicPaths = new HashSet<string>(StringComparer.Ordinal) { "/v1/auth/dev", "/v1/auth/challenge", "/v1/auth/phone/challenge", "/v1/auth/sign-in", "/v1/auth/refresh", "/v1/auth/apple/callback", "/v1/billing/webhook", "/health" };
 app.Use(async (ctx, next) =>
 {
     var limits = ctx.RequestServices.GetRequiredService<ApiRateLimits>();
@@ -82,6 +85,10 @@ string Key(HttpContext ctx) => ctx.Request.Headers["Idempotency-Key"].ToString()
 app.MapGet("/health", () => new { status = "ok", service = "hisaab" });
 app.MapPost("/v1/auth/apple/callback", AppleCallback.HandleAsync);
 app.MapGet("/v1/auth/challenge", (IdentityService identity, CancellationToken ct) => identity.ChallengeAsync(ct));
+app.MapPost("/v1/auth/phone/challenge", (HttpContext ctx, PhoneChallengeRequest input, PhoneOtpService phone, CancellationToken ct) => phone.ChallengeAsync(input.PhoneNumber, ApiRateLimits.Source(ctx.Connection.RemoteIpAddress), ct: ct));
+app.MapPost("/v1/auth/phone/link/challenge", (HttpContext ctx, PhoneChallengeRequest input, PhoneOtpService phone, CancellationToken ct) => phone.ChallengeAsync(input.PhoneNumber, ApiRateLimits.Source(ctx.Connection.RemoteIpAddress), "link", Current(ctx), ct));
+app.MapPost("/v1/auth/phone/reauthenticate/challenge", (HttpContext ctx, PhoneChallengeRequest input, PhoneOtpService phone, CancellationToken ct) => phone.ChallengeAsync(input.PhoneNumber, ApiRateLimits.Source(ctx.Connection.RemoteIpAddress), "reauthenticate", Current(ctx), ct));
+app.MapPost("/v1/auth/phone/reauthenticate", (HttpContext ctx, PhoneReauthenticationRequest input, IdentityService identity, CancellationToken ct) => identity.ReauthenticatePhoneAsync(Current(ctx), input, ct));
 app.MapPost("/v1/auth/dev", (DevSignInRequest input, IdentityService identity, CancellationToken ct) => identity.DevAsync(input.DisplayName, ct));
 app.MapPost("/v1/auth/sign-in", (SignInRequest input, IdentityService identity, CancellationToken ct) => identity.SignInAsync(input, ct));
 app.MapPost("/v1/auth/refresh", (RefreshRequest input, IdentityService identity, CancellationToken ct) => identity.RefreshAsync(input.RefreshToken, ct));

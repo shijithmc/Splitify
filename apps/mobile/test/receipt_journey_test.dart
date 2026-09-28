@@ -67,7 +67,7 @@ void main() {
         400,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.textContaining('Check this reading'), findsWidgets);
+      expect(find.textContaining('Check this reading'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('Calculate & check split'),
         500,
@@ -155,75 +155,57 @@ void main() {
       coordinator.dispose();
     },
   );
-  testWidgets(
-    'illustrated capture keeps the live allowance and safe actions at large text sizes',
-    (tester) async {
-      tester.view.physicalSize = const Size(375, 812);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final controller = ReceiptTestController();
-      await controller.startDemo();
-      final group = Group.from(
-        await controller.request(
-          'GET',
-          '/groups/${controller.groups.first.id}',
+  testWidgets('manual receipt attachment stays usable at large text sizes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final controller = ReceiptTestController();
+    await controller.startDemo();
+    final group = Group.from(
+      await controller.request('GET', '/groups/${controller.groups.first.id}'),
+    );
+    final coordinator = ReceiptCoordinator(
+      repository: controller.repository!,
+      account: controller.userId,
+      current: () => controller.signedIn,
+      foreground: () => true,
+      store: MemoryReceiptStore(),
+    );
+    controller.receiptOverride = coordinator;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: HisaabTheme.light,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!,
         ),
-      );
-      final coordinator = ReceiptCoordinator(
-        repository: controller.repository!,
-        account: controller.userId,
-        current: () => controller.signedIn,
-        foreground: () => true,
-        store: MemoryReceiptStore(),
-      );
-      controller.receiptOverride = coordinator;
-      for (var i = 0; i < 2; i++) {
-        final counted = await coordinator.create(group.id);
-        counted['demoCounted'] = true;
-        counted['status'] = 'attached';
-      }
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: HisaabTheme.light,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(1.5)),
-            child: child!,
-          ),
-          home: ReceiptCapturePage(controller: controller, group: group),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('3 of 5 scans left this month'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('Read bill'),
-        350,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Read bill'),
-            )
-            .onPressed,
-        isNull,
-      );
-      expect(
-        tester
-            .widget<TextButton>(
-              find.widgetWithText(
-                TextButton,
-                'Enter manually with these photos',
-              ),
-            )
-            .onPressed,
-        isNull,
-      );
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-      coordinator.dispose();
-    },
-  );
+        home: ReceiptCapturePage(controller: controller, group: group),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('scans left'), findsNothing);
+    expect(find.text('Read bill'), findsNothing);
+    expect(find.text('Allow Google AI to read this bill'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Attach photos & enter details'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Attach photos & enter details'),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    coordinator.dispose();
+  });
 }

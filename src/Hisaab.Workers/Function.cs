@@ -47,12 +47,13 @@ public sealed class Function
         }
     }
 
-    private static async Task<IHost> CreateHostAsync()
+    internal static async Task<IHost> CreateHostAsync(HostApplicationBuilder? builder = null)
     {
-        var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
+        builder ??= Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
         await ConfigurationSecrets.LoadAsync(builder.Configuration);
         builder.Services.AddHttpClient().ConfigureHttpClientDefaults(options =>
             options.ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(15)));
+        builder.Services.AddHttpClient("phone-otp", client => client.Timeout = TimeSpan.FromSeconds(8));
         builder.Services.AddSingleton<IAtomicStore>(_ =>
         {
             var table = builder.Configuration["Hisaab:TableName"];
@@ -62,6 +63,10 @@ public sealed class Function
             return new LocalAtomicStore(builder.Configuration["Hisaab:LocalDataPath"] ?? Path.Combine(".local", "hisaab.json"));
         });
         builder.Services.AddSingleton<IProviderVerifier, ProviderVerifier>();
+        builder.Services.AddSingleton<IPhoneOtpProvider, PhoneOtpProvider>();
+        builder.Services.AddSingleton<PhoneOtpService>();
+        builder.Services.AddSingleton<DistributedRateLimiter>();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<TokenProtector>();
         builder.Services.AddSingleton<AppleTokens>();
         builder.Services.AddSingleton<IdentityService>();
@@ -75,7 +80,6 @@ public sealed class Function
         builder.Services.AddSingleton<ReceiptAccess>();
         builder.Services.AddSingleton<ReceiptDocuments>();
         builder.Services.AddSingleton<ReceiptQuotaService>();
-        builder.Services.AddSingleton<ReceiptBudgetService>();
         builder.Services.AddSingleton<ReceiptLifecycle>();
         builder.Services.AddSingleton<ReceiptAttachmentService>();
         builder.Services.AddSingleton<ReceiptService>();

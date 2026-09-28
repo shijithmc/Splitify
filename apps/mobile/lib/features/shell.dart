@@ -6,12 +6,14 @@ import '../core/controller.dart';
 import '../core/design.dart';
 import '../core/models.dart';
 import '../core/money.dart';
+import '../core/phone_auth.dart';
 import '../main.dart';
 import 'group.dart';
 import 'settings.dart';
 import 'shared.dart';
 import 'receipts.dart';
 import 'receipt_viewer.dart';
+import 'phone_sign_in.dart';
 
 class AppShell extends StatefulWidget {
   final AppController controller;
@@ -447,16 +449,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _quickAction(
-              'Scan bill',
-              Icons.document_scanner_outlined,
+              'Attach receipt',
+              Icons.attach_file_rounded,
               HisaabColors.peach,
-              () => _groupAction(scan: true),
+              () => _groupAction(attachReceipt: true),
             ),
             _quickAction(
               'Settle up',
               Icons.arrow_outward_rounded,
               HisaabColors.lilac,
-              () => _groupAction(scan: false),
+              () => _groupAction(attachReceipt: false),
             ),
           ],
         ),
@@ -551,7 +553,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ),
   );
 
-  Future<void> _groupAction({required bool scan}) async {
+  Future<void> _groupAction({required bool attachReceipt}) async {
     final active = c.groups.where((g) => !g.archived).toList();
     if (active.isEmpty) {
       await createGroup(context, c);
@@ -568,8 +570,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(20),
                 children: [
                   Text(
-                    scan
-                        ? 'Which bill are we splitting?'
+                    attachReceipt
+                        ? 'Choose a group for this receipt'
                         : 'Choose a group to settle up',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -594,7 +596,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       await openPage(
         context,
         c,
-        scan
+        attachReceipt
             ? ReceiptCapturePage(controller: c, group: detail)
             : SettlementPage(controller: c, group: detail),
       );
@@ -1099,6 +1101,26 @@ class _WelcomeState extends State<Welcome> {
                       : null,
                   icon: const Icon(Icons.apple),
                   label: const Text('Continue with Apple'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: AppConfig.configured
+                      ? () => widget.controller.loginPhone(
+                          (repo) => Navigator.of(context).push<Json>(
+                            MaterialPageRoute(
+                              builder: (_) => PhoneSignInPage(
+                                service: PhoneAuthService(
+                                  repo,
+                                  isCurrent: () =>
+                                      mounted && !widget.controller.signedIn,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : null,
+                  icon: const Icon(Icons.phone_outlined),
+                  label: const Text('Continue with phone'),
                 ),
               ],
               if (widget.controller.pendingInvite != null)

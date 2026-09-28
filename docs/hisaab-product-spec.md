@@ -23,7 +23,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 
 > **As a** trip organiser, **I want** to create a group and invite people by link or phone/email, including people who haven't signed up yet **so that** I can log expenses before they install the app.
 
-> **As a** new user, **I want** to sign in with one tap using Apple or Google **so that** I don't have to create or remember a password.
+> **As a** new user, **I want** to sign in using Apple, Google or a phone number with an SMS code **so that** I don't have to create or remember a password.
 
 > **As a** free user, **I want** ads that never block me from adding an expense or settling up **so that** the free app stays usable.
 
@@ -58,7 +58,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 # Acceptance Criteria
 
 **Auth**
-1. [ ] [MUST] User can sign in with Apple on iOS and with Google on both iOS and Android.
+1. [ ] [MUST] User can sign in with Apple on iOS, Google on both iOS and Android, or a phone number verified by SMS OTP. Phone codes expire, retries are bounded, and sign-in, linking and deletion reauthentication require server verification.
 2. [ ] [MUST] The same email signing in with Apple and with Google is not silently merged; the user is offered an explicit account link after re-authenticating.
 3. [ ] [MUST] Apple "Hide My Email" relay addresses work end-to-end (sign in, notifications, account lookup).
 4. [ ] [MUST] A session survives an app restart, and sign-out clears all local data.
@@ -67,7 +67,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 **Groups & Friends**
 6. [ ] [MUST] User can create, rename and archive a group. Group types: Home, Trip, Couple, Other.
 7. [ ] [MUST] User can invite by share link, phone or email. Invitees who haven't signed up appear as placeholder members and can be assigned expenses.
-8. [ ] [MUST] When an invitee signs up with the matching phone/email or opens the link, their placeholder history is claimed.
+8. [ ] [MUST] An invitee explicitly claims placeholder history through a scoped invitation link or a freshly verified provider email. A typed phone number or phone sign-in alone does not claim placeholder history.
 9. [ ] [MUST] Expenses can be logged 1:1 with a friend outside any group.
 10. [ ] [MUST] A group can't have more than 50 members. Adding a 51st shows a clear error.
 
@@ -120,7 +120,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 
 **Happy Path: first trip expense, then going ad-free**
 1. Install the app, then onboarding shows 3 cards: split / track / settle.
-2. Tap "Continue with Google" (or Apple). The native sheet signs you in and your account is created in under 3 seconds.
+2. Tap "Continue with Google" (or Apple) and complete the native sheet, or choose phone sign-in and verify the SMS code. The existing native sign-in target is under 3 seconds; SMS delivery latency is measured separately.
 3. Empty home state: "No expenses yet — create a group or add a friend."
 4. Create group "Goa Trip", pick type Trip, share the invite link to WhatsApp.
 5. Three friends join via the link. Rahul hasn't installed the app, so he's added by phone as a placeholder.
@@ -174,7 +174,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 - We will NOT add recurring expenses. *Future: v2 scheduler.*
 - We will NOT build a web app. *Future: v3.*
 - We will NOT offer premium features beyond ad removal (charts, export insights, themes). *Future: Pro tier bundle reassessed after conversion data.*
-- We will NOT support email/password or phone-OTP login. Apple and Google cover the target market, and OTP carries SMS cost plus a live-OTP approval gate.
+- We will NOT support email/password login. Phone-OTP login is included alongside Apple and Google; configured SMS delivery and live-device acceptance remain release prerequisites.
 - We will NOT support offline writes. The sync conflict model adds significant complexity.
 - We will NOT build a full admin console. Support gets a minimal entitlement lookup/grant tool only.
 - We will NOT use AWS WAF, per the account-wide ban. Abuse control is API Gateway throttling plus app-level rate limits.
@@ -263,7 +263,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 - Assumed a **50-member group cap**. If larger groups (e.g. office groups of 200) are needed, the balance model must switch from transactional pairwise updates to async projection.
 - Assumed **entitlement is per account and cross-platform**. If per-store only, users who switch platforms pay twice and support load rises.
 - Assumed **AdMob** as the ad network. With another network, the consent and mediation setup changes.
-- Assumed **no OTP login**. If phone login is added, it needs explicit approval under the live-OTP rule plus SMS budget.
+- Phone-OTP login was added to the accepted scope on **28 September 2026**. SMS provider setup, attempt budgets and live acceptance are tracked in the [authentication runbook](runbooks/authentication.md).
 
 ---
 
@@ -271,7 +271,7 @@ Indian users split rent, trips, groceries and dinners every week. Today they tra
 
 | Phase | Scope | Value Delivered | Estimated Effort |
 |---|---|---|---|
-| v1 — MVP | Apple/Google sign-in, account linking + deletion; groups + 1:1 friends; invites (link/phone/email, placeholders); expenses with 4 split modes; balances; record settle-up; activity feed; push; AdMob banners + capped interstitials; ₹299/yr ad-free cross-platform entitlement with restore; nightly reconciliation; support entitlement tool | Core Splitwise-equivalent loop, monetised from day 1 | XL (~10–12 weeks, 2 backend + 2 mobile) |
+| v1 — MVP | Apple/Google/phone-OTP sign-in, account linking + deletion; groups + 1:1 friends; invites (link/phone/email, placeholders); expenses with 4 split modes; balances; record settle-up; activity feed; push; AdMob banners + capped interstitials; ₹299/yr ad-free cross-platform entitlement with restore; nightly reconciliation; support entitlement tool | Core Splitwise-equivalent loop, monetised from day 1 | XL (~10–12 weeks, 2 backend + 2 mobile) |
 | v2 | Simplify debts; multi-currency; receipt photos; recurring expenses; offline add queue; UPI intent deep link; CSV export; search; Sign in with Apple on Android | Parity-plus vs Splitwise Pro, stronger retention | L |
 | v3+ | Receipt OCR; spending charts/insights; web app; Pro tier bundle; itemised bill splitting | New paid value beyond ad removal, higher ARPU | L–XL |
 
