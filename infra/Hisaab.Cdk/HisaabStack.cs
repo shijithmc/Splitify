@@ -215,6 +215,29 @@ public sealed class HisaabStack : Stack
         });
         var stage = (CfnStage)httpApi.DefaultStage!.Node.DefaultChild!;
         stage.DefaultRouteSettings = new CfnStage.RouteSettingsProperty { ThrottlingBurstLimit = 100, ThrottlingRateLimit = 50 };
+        var defaultRoute = httpApi.Node.FindAll().OfType<CfnRoute>().Single(route => route.RouteKey == "$default");
+        var aiRouteSettings = new Dictionary<string, object>();
+        foreach (var (routeId, path) in new[]
+        {
+            ("ReceiptUploadRoute", "/v1/groups/{groupId}/receipts"),
+            ("ReceiptCompleteRoute", "/v1/receipts/{id}/complete"),
+            ("ReceiptRetryRoute", "/v1/receipts/{id}/retry")
+        })
+        {
+            var routeKey = "POST " + path;
+            // The default route already grants this API permission to invoke the same integration.
+            var route = new CfnRoute(this, routeId, new CfnRouteProps
+            {
+                ApiId = httpApi.ApiId, RouteKey = routeKey, Target = defaultRoute.Target,
+                AuthorizationType = "NONE"
+            });
+            stage.AddResourceDependency(route);
+            aiRouteSettings[routeKey] = new Dictionary<string, object>
+            {
+                ["ThrottlingBurstLimit"] = 10, ["ThrottlingRateLimit"] = 5
+            };
+        }
+        stage.RouteSettings = aiRouteSettings;
         var accessLogs = new LogGroup(this, "HttpAccessLogs", new LogGroupProps { Retention = RetentionDays.ONE_MONTH });
         stage.AccessLogSettings = new CfnStage.AccessLogSettingsProperty
         {

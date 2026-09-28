@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Threading.RateLimiting;
 using Amazon.DynamoDBv2;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using Hisaab.Api.Billing;
@@ -12,7 +11,6 @@ using Hisaab.Api.Shared;
 using Hisaab.Application.Storage;
 using Hisaab.Domain;
 using Hisaab.Infrastructure.Storage;
-using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 // Request-start diagnostics include query strings (receipt tickets). Keep transport
@@ -49,19 +47,13 @@ builder.Services.AddSingleton<ReceiptQuotaService>(); builder.Services.AddSingle
 builder.Services.AddSingleton<ReceiptAttachmentService>(); builder.Services.AddSingleton<ReceiptService>();
 builder.Services.AddSingleton<ReceiptLifecycle>(); builder.Services.AddSingleton<ReceiptWorker>();
 builder.Services.AddReceiptInfrastructure(builder.Configuration, builder.Environment);
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = 429;
-    options.OnRejected = async (context, ct) =>
-    {
-        context.HttpContext.Response.Headers.RetryAfter = "60";
-        await context.HttpContext.Response.WriteAsJsonAsync(new { code = "rate_limited", message = "Too many requests. Please retry in a minute.", correlationId = context.HttpContext.TraceIdentifier }, ct);
-    };
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx => RateLimitPartition.GetFixedWindowLimiter(
-        (ctx.Request.Path.StartsWithSegments("/v1/auth") ? "auth:" : "api:") + (ctx.Items.TryGetValue("actor", out var actor) && actor is Actor a ? a.User.Id : ctx.Connection.RemoteIpAddress?.ToString() ?? "anonymous"),
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = ctx.Request.Path.StartsWithSegments("/v1/auth") ? 30 : 240, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
-});
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<DistributedRateLimiter>();
+builder.Services.AddSingleton<ApiRateLimits>();
+builder.Services.AddOptions<ApiRateLimitOptions>().BindConfiguration("Hisaab:RateLimits")
+    .Validate(options => options.IsValid(), "Every API rate limit must be between 1 and 10000 requests per minute.").ValidateOnStart();
 var app = builder.Build();
+app.UseRouting();
 app.Use(async (ctx, next) =>
 {
     try { await next(); }
@@ -74,15 +66,17 @@ app.Use(async (ctx, next) =>
 var publicPaths = new HashSet<string>(StringComparer.Ordinal) { "/v1/auth/dev", "/v1/auth/challenge", "/v1/auth/sign-in", "/v1/auth/refresh", "/v1/auth/apple/callback", "/v1/billing/webhook", "/health" };
 app.Use(async (ctx, next) =>
 {
+    var limits = ctx.RequestServices.GetRequiredService<ApiRateLimits>();
+    if (!await limits.AdmitIngressAsync(ctx)) return;
     if (!publicPaths.Contains(ctx.Request.Path.Value ?? ""))
     {
         var bearer = ctx.Request.Headers.Authorization.ToString();
         if (!bearer.StartsWith("Bearer ", StringComparison.Ordinal)) throw new DomainException(401, "sign_in_required", "Sign in to continue.");
         ctx.Items["actor"] = await ctx.RequestServices.GetRequiredService<IdentityService>().AuthenticateAsync(bearer[7..], ctx.RequestAborted);
+        if (!await limits.AdmitAccountAsync(ctx, (Actor)ctx.Items["actor"]!)) return;
     }
     await next();
 });
-app.UseRateLimiter();
 Actor Current(HttpContext ctx) => (Actor)ctx.Items["actor"]!;
 string Key(HttpContext ctx) => ctx.Request.Headers["Idempotency-Key"].ToString();
 app.MapGet("/health", () => new { status = "ok", service = "hisaab" });

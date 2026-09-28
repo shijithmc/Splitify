@@ -81,6 +81,36 @@ public sealed class InfrastructurePolicyTests
             var json = JsonSerializer.Serialize(template.ToJSON());
             using var document = JsonDocument.Parse(json);
             var resources = document.RootElement.GetProperty("Resources");
+            var routes = resources.EnumerateObject()
+                .Where(resource => resource.Value.GetProperty("Type").GetString() == "AWS::ApiGatewayV2::Route")
+                .ToDictionary(resource => resource.Value.GetProperty("Properties").GetProperty("RouteKey").GetString()!);
+            Assert.Equal(4, routes.Count);
+            template.ResourceCountIs("AWS::ApiGatewayV2::Integration", 1);
+            var defaultRoute = routes["$default"].Value.GetProperty("Properties");
+            var apiStage = resources.EnumerateObject()
+                .Single(resource => resource.Value.GetProperty("Type").GetString() == "AWS::ApiGatewayV2::Stage");
+            var stageProperties = apiStage.Value.GetProperty("Properties");
+            Assert.Equal("$default", stageProperties.GetProperty("StageName").GetString());
+            var defaults = stageProperties.GetProperty("DefaultRouteSettings");
+            Assert.Equal(100, defaults.GetProperty("ThrottlingBurstLimit").GetInt32());
+            Assert.Equal(50, defaults.GetProperty("ThrottlingRateLimit").GetInt32());
+            var routeSettings = stageProperties.GetProperty("RouteSettings");
+            Assert.Equal(3, routeSettings.EnumerateObject().Count());
+            foreach (var routeKey in new[]
+            {
+                "POST /v1/groups/{groupId}/receipts",
+                "POST /v1/receipts/{id}/complete",
+                "POST /v1/receipts/{id}/retry"
+            })
+            {
+                var route = routes[routeKey];
+                var properties = route.Value.GetProperty("Properties");
+                Assert.Equal(defaultRoute.GetProperty("ApiId").GetRawText(), properties.GetProperty("ApiId").GetRawText());
+                Assert.Equal(defaultRoute.GetProperty("Target").GetRawText(), properties.GetProperty("Target").GetRawText());
+                Assert.Equal(10, routeSettings.GetProperty(routeKey).GetProperty("ThrottlingBurstLimit").GetInt32());
+                Assert.Equal(5, routeSettings.GetProperty(routeKey).GetProperty("ThrottlingRateLimit").GetInt32());
+                Assert.Contains(apiStage.Value.GetProperty("DependsOn").EnumerateArray(), dependency => dependency.GetString() == route.Name);
+            }
             foreach (var resource in resources.EnumerateObject())
             {
                 var type = resource.Value.GetProperty("Type").GetString()!;

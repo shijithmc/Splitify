@@ -220,7 +220,7 @@ Typing a restaurant or grocery bill into a split app is slow and error-prone. It
 5. **Should the bill image survive the uploader deleting their account?** It's evidence other members rely on, but it may contain the uploader's PII. **Default: keep with the group record, anonymise the uploader, and let any member remove it.**
 6. **Should confirmed corrections be used to improve prompts?** Using real bills for improvement needs consent. **Default: store only anonymised field-level "was corrected" flags, never images, for accuracy metrics.**
 7. **How are GST lines handled when the bill shows tax-inclusive and exclusive items together?** It affects distribution accuracy. **Default: distribute every non-item charge proportionally to item subtotal. The payer can override per charge.**
-8. **What's the monthly AI budget ceiling?** It sets alarm and kill-switch thresholds. **Default: alarm at 80% of an agreed monthly budget; pause free-tier scans (not paid) at 100%.**
+8. **What's the monthly AI budget ceiling?** It sets alarm and kill-switch thresholds. **Updated 2026-09-28 for abuse prevention: alarm at 80% of an agreed monthly budget; stop new scans for every plan, including paid subscribers, before the next attempt would exceed 100%.** This supersedes the original free-only pause policy. Failed and retried attempts retain their conservative cost reservation; an exhausted budget cannot be bypassed by subscription status.
 
 ---
 
