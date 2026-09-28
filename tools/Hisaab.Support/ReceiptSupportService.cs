@@ -10,22 +10,8 @@ public sealed class ReceiptSupportService(IAtomicStore store)
         if(!Guid.TryParseExact(receiptId,"D",out _))throw new ArgumentException("RECEIPT_UUID must be a receipt UUID.");ValidateAudit(ticket,operatorId);
         var row=await store.GetAsync($"RECEIPT#{receiptId}","META",ct);
         var record=row?.Deserialize<ReceiptRecord>();
-        await store.TransactAsync([Audit("lookup-scan",receiptId,ticket,operatorId)],ct);
+        await store.TransactAsync([Audit("lookup-receipt",receiptId,ticket,operatorId)],ct);
         return record is null?null:new(record.Id,record.State,record.Version,record.CreatedAt,record.ExpiresAt,record.Attempts,record.ErrorCode,record.ReservationHeld,record.Counted,record.ImagesRemoved,record.PurgeAt,record.LeaseUntil,record.ExpenseId is not null,record.Media.Count);
-    }
-    public async Task<ReceiptRuntimeControl> ControlAsync(string mode,string ticket,string operatorId,bool confirmed,CancellationToken ct=default)
-    {
-        ValidateAudit(ticket,operatorId);if(!confirmed)throw new ArgumentException("--confirm is required for runtime control changes.");
-        if(mode is not("stop" or "pause-free" or "resume"))throw new ArgumentException("Control must be stop, pause-free or resume.");
-        for(var attempt=0;attempt<5;attempt++)
-        {
-            var row=await store.GetAsync("OPERATIONS","RECEIPTS",ct);var current=row?.Deserialize<ReceiptRuntimeControl>()??new();
-            // pause-free never clears a previously activated emergency stop.
-            var next=mode switch{"stop"=>current with{EmergencyStop=true},"pause-free"=>current with{PauseFree=true},_=>new ReceiptRuntimeControl()};
-            try{await store.TransactAsync([StoreMutation.Put(StoreRow.Create("OPERATIONS","RECEIPTS",(row?.Version??0)+1,next),row?.Version),Audit("receipt-control:"+mode,"receipts",ticket,operatorId)],ct);return next;}
-            catch(StoreConflictException)when(attempt<4){}
-        }
-        throw new InvalidOperationException("Receipt runtime control changed concurrently. Retry.");
     }
     private static StoreMutation Audit(string action,string entity,string ticket,string operatorId)
     {

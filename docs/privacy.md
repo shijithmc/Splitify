@@ -1,6 +1,6 @@
 # Hisaab beta privacy notice
 
-Updated 27 September 2026.
+Updated 28 September 2026.
 
 This notice describes the Hisaab TestFlight beta. For privacy questions or help with your data, contact the developer at [shijithmc@icloud.com](mailto:shijithmc@icloud.com).
 
@@ -16,7 +16,7 @@ Group members can see the group's shared expense records, participant names, bal
 
 Camera and file access let you choose bills to attach to expenses. Images and documents may contain names, addresses, phone numbers or payment details. The app normalizes selected images for upload and removes embedded image metadata. Local receipt drafts and images are encrypted with an account-specific key held in secure device storage. Temporary files used during camera capture or import are separate from these encrypted drafts and are cleaned up after processing; an interrupted app session can leave temporary files for later system cleanup.
 
-Receipt images you submit, reviewed line items and allocations are stored with your account or group. AI scanning depends on service availability. Before using it, the app asks you to allow Google AI to process bill images to extract items and totals. Manual entry is available without AI processing. If you choose AI scanning, images are sent to Google's Vertex AI service through its Mumbai region. The app requires you to review the result before saving an expense.
+Receipt images you submit, manually entered line items and allocations are stored with your account or group. Hisaab no longer provides AI bill scanning or sends receipt images to an AI provider. You enter and review receipt amounts before saving an expense. Previously saved receipts and their reviewed accounting records remain available to authorized group members.
 
 Session credentials and account-specific cached views are kept in secure device storage so you can remain signed in and view previously loaded information. Sign-out clears the app's stored session, personal cache and encrypted receipt drafts on that device.
 

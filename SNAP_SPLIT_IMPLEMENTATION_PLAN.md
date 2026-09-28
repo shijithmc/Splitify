@@ -1,3 +1,5 @@
+> Historical design: AI bill scanning was removed on 28 September 2026. Manual receipt attachments remain. See [current receipt contract](docs/api/receipts-contract.md).
+
 # Snap & Split implementation plan
 
 Prepared 26 September 2026 against Hisaab commit `15cf5cf`. Status: **proposed plan, not implemented**. The [original specification](docs/snap-split-product-spec.md) is preserved unchanged. This document answers its first two open questions with recommendations, identifies decisions that need confirmation, and maps all 38 acceptance criteria to implementation and verification work.

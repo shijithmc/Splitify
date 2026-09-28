@@ -287,12 +287,6 @@ class AppController extends ChangeNotifier {
       final verified = await request('POST', '/billing/refresh');
       if (!currentAccount()) return;
       entitlement = verified;
-      if (_receipts != null) {
-        try {
-          await _receipts!.refreshAllowance();
-        } catch (_) {}
-        if (!currentAccount()) return;
-      }
       final status = (verified['status'] as String? ?? '').toLowerCase();
       if (verified['adFree'] == true ||
           [

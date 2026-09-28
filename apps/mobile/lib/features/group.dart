@@ -231,11 +231,8 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                             await load();
                             await c.refresh();
                           },
-                          icon: const Icon(
-                            Icons.document_scanner_outlined,
-                            size: 18,
-                          ),
-                          label: const Text('Scan bill'),
+                          icon: const Icon(Icons.attach_file_rounded, size: 18),
+                          label: const Text('Attach receipt'),
                         ),
                       OutlinedButton.icon(
                         onPressed: group!.archived || c.offline

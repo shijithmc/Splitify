@@ -4,7 +4,7 @@ Flutter app for iOS and Android. Includes onboarding, native Google/Apple identi
 
 ## Illustrated interface
 
-The approved illustrated design is implemented across the app's supported flows: welcome/sign-in, Home and group lists, expense entry and split review, group activity, payment recording, receipt capture/review/assignment/viewing, settings and the annual plan. Home has shortcuts for expense entry, group-specific bill scanning and payment recording. All amounts, member details, scan allowances and store prices come from the current controller/repository.
+The approved illustrated design is implemented across the app's supported flows: welcome/sign-in, Home and group lists, expense entry and split review, group activity, payment recording, receipt capture/review/assignment/viewing, settings and the annual plan. Home has shortcuts for expense entry, group-specific receipt attachment and payment recording. All amounts, member details and store prices come from the current controller/repository.
 
 `lib/core/design.dart` defines the evergreen, lime and warm ivory palette, Material 3 controls and bundled Outfit/Work Sans fonts. Editorial illustrations accompany welcome, group and receipt screens. `PageBody` constrains reading width on tablets, while forms and camera controls remain scrollable at larger text sizes. Asset provenance and font licences are in `assets/`.
 

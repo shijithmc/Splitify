@@ -444,16 +444,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               () => _addExpense(),
             ),
             _quickAction(
-              'Scan bill',
-              Icons.document_scanner_outlined,
+              'Attach receipt',
+              Icons.attach_file_rounded,
               HisaabColors.peach,
-              () => _groupAction(scan: true),
+              () => _groupAction(attachReceipt: true),
             ),
             _quickAction(
               'Settle up',
               Icons.arrow_outward_rounded,
               HisaabColors.lilac,
-              () => _groupAction(scan: false),
+              () => _groupAction(attachReceipt: false),
             ),
           ],
         ),
@@ -589,7 +589,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ),
   );
 
-  Future<void> _groupAction({required bool scan}) async {
+  Future<void> _groupAction({required bool attachReceipt}) async {
     final active = c.groups.where((g) => !g.archived).toList();
     if (active.isEmpty) {
       await createGroup(context, c);
@@ -606,8 +606,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(20),
                 children: [
                   Text(
-                    scan
-                        ? 'Which bill are we splitting?'
+                    attachReceipt
+                        ? 'Choose a group for this receipt'
                         : 'Choose a group to settle up',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -632,7 +632,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       await openPage(
         context,
         c,
-        scan
+        attachReceipt
             ? ReceiptCapturePage(controller: c, group: detail)
             : SettlementPage(controller: c, group: detail),
       );

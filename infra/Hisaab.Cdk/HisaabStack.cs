@@ -148,12 +148,6 @@ public sealed class HisaabStack : Stack
         ScheduleJob("ReceiptMaintenance", "receipt-maintenance", Duration.Minutes(1), receiptWorker, workerFailureQueue);
         new Alarm(this, "ReceiptWorkerErrors", new AlarmProps { Metric = receiptWorker.MetricErrors(), Threshold = 1, EvaluationPeriods = 1, TreatMissingData = TreatMissingData.NOT_BREACHING });
         new Alarm(this, "ReceiptQueueAge", new AlarmProps { Metric = receiptQueue.MetricApproximateAgeOfOldestMessage(), Threshold = 60, EvaluationPeriods = 1, TreatMissingData = TreatMissingData.NOT_BREACHING });
-        foreach (var metricName in new[] { "Budget80", "CircuitOpen" })
-            new Alarm(this, "Receipt" + metricName, new AlarmProps
-            {
-                Metric = new Metric(new MetricProps { Namespace = "Hisaab/Receipts", MetricName = metricName, Statistic = "Maximum", Period = Duration.Minutes(1) }),
-                Threshold = 1, EvaluationPeriods = 1, TreatMissingData = TreatMissingData.NOT_BREACHING
-            });
         foreach (var function in new[] { api, worker, receiptWorker })
         {
             function.AddToRolePolicy(new PolicyStatement(new PolicyStatementProps
@@ -216,12 +210,11 @@ public sealed class HisaabStack : Stack
         var stage = (CfnStage)httpApi.DefaultStage!.Node.DefaultChild!;
         stage.DefaultRouteSettings = new CfnStage.RouteSettingsProperty { ThrottlingBurstLimit = 100, ThrottlingRateLimit = 50 };
         var defaultRoute = httpApi.Node.FindAll().OfType<CfnRoute>().Single(route => route.RouteKey == "$default");
-        var aiRouteSettings = new Dictionary<string, object>();
+        var receiptRouteSettings = new Dictionary<string, object>();
         foreach (var (routeId, path) in new[]
         {
             ("ReceiptUploadRoute", "/v1/groups/{groupId}/receipts"),
-            ("ReceiptCompleteRoute", "/v1/receipts/{id}/complete"),
-            ("ReceiptRetryRoute", "/v1/receipts/{id}/retry")
+            ("ReceiptCompleteRoute", "/v1/receipts/{id}/complete")
         })
         {
             var routeKey = "POST " + path;
@@ -232,12 +225,12 @@ public sealed class HisaabStack : Stack
                 AuthorizationType = "NONE"
             });
             stage.AddResourceDependency(route);
-            aiRouteSettings[routeKey] = new Dictionary<string, object>
+            receiptRouteSettings[routeKey] = new Dictionary<string, object>
             {
                 ["ThrottlingBurstLimit"] = 10, ["ThrottlingRateLimit"] = 5
             };
         }
-        stage.RouteSettings = aiRouteSettings;
+        stage.RouteSettings = receiptRouteSettings;
         var accessLogs = new LogGroup(this, "HttpAccessLogs", new LogGroupProps { Retention = RetentionDays.ONE_MONTH });
         stage.AccessLogSettings = new CfnStage.AccessLogSettingsProperty
         {

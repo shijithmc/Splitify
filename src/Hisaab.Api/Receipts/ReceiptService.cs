@@ -8,21 +8,16 @@ namespace Hisaab.Api.Receipts;
 public sealed class ReceiptService(IAtomicStore store, CommandExecutor commands, ReceiptAccess access,
     ReceiptQuotaService quotas, ReceiptDocuments documents, IReceiptBlobStore blobs, ReceiptAttachmentService attachments, IConfiguration config)
 {
-    public async Task<ReceiptAllowance> AllowanceAsync(Actor actor,CancellationToken ct)
-    { await access.EnsureSessionAsync(actor,ct); return await quotas.AllowanceAsync(actor.User.Id,ct); }
+    public async Task<object> AllowanceAsync(Actor actor,CancellationToken ct)
+    { await access.EnsureSessionAsync(actor,ct); throw ScanningRemoved(); }
     public async Task<JsonElement> ConsentAsync(Actor actor,string key,ReceiptConsentRequest input,CancellationToken ct)
-    {
-        await access.EnsureSessionAsync(actor,ct);
-        if(input.Version!=ReceiptQuotaService.ConsentVersion||!input.Accepted)throw new DomainException(422,"receipt_consent_required","Accept the current Google processing notice to scan receipts.");
-        return await commands.ExecuteAsync(actor,key,"receipts:consent",input,async()=>
-        {
-            var row=await store.GetAsync($"USER#{actor.User.Id}","RECEIPT_CONSENT",ct); var value=new ReceiptConsent(input.Version,true,DateTimeOffset.UtcNow);
-            return new(value,[StoreMutation.Put(StoreRow.Create($"USER#{actor.User.Id}","RECEIPT_CONSENT",(row?.Version??0)+1,value),row?.Version)]);
-        },ct);
-    }
+    { await access.EnsureSessionAsync(actor,ct); throw ScanningRemoved(); }
+    private static DomainException ScanningRemoved()=>new(410,"ai_scanning_removed","AI bill scanning has been removed. Attach a receipt and enter the details manually.");
     public async Task<object> CreateAsync(Actor actor,string key,string groupId,ReceiptCreateRequest input,CancellationToken ct)
     {
-        await access.EnsureSessionAsync(actor,ct); await access.GroupAsync(groupId,actor.User.Id,ct);
+        await access.EnsureSessionAsync(actor,ct);
+        if(input.ScanRequested)throw ScanningRemoved();
+        await access.GroupAsync(groupId,actor.User.Id,ct);
         if(!Guid.TryParseExact(input.Id,"D",out _)||input.Images is null||input.Images.Count is <1 or >3)throw new DomainException(422,"receipt_images_invalid","Choose one to three receipt images.");
         if(input.Images.Select(x=>x.Id).Distinct(StringComparer.Ordinal).Count()!=input.Images.Count)throw new DomainException(422,"receipt_images_invalid","Each image needs its own ID.");
         foreach(var image in input.Images)
@@ -31,9 +26,19 @@ public sealed class ReceiptService(IAtomicStore store, CommandExecutor commands,
         await commands.ExecuteAsync(actor,key,$"receipts:create:{groupId}",input,async()=>
         {
             var groupRow=await access.GroupAsync(groupId,actor.User.Id,ct);var group=groupRow.Deserialize<Group>();GroupRules.EnsureWritable(group);
-            if(await store.GetAsync($"RECEIPT#{input.Id}","META",ct)is not null)throw new DomainException(409,"receipt_exists","This receipt already exists.");
+            var existingRow=await store.GetAsync($"RECEIPT#{input.Id}","META",ct);
+            if(existingRow is not null)
+            {
+                var existing=existingRow.Deserialize<ReceiptRecord>();
+                // A saved draft from an older app keeps its ID and images when switching to manual entry.
+                var matchingImages=existing.Uploads.Select(x=>new ReceiptUploadInput(x.Id,x.ContentType,x.SizeBytes,x.Sha256)).SequenceEqual(input.Images.Select(x=>x with{Sha256=x.Sha256.ToLowerInvariant()}));
+                if(!existing.ScanRequested||existing.UploaderId!=actor.User.Id||existing.GroupId!=groupId||existing.ExpenseId is not null||existing.ImagesRemoved||existing.ExpiresAt<=DateTimeOffset.UtcNow||existing.State is not("awaiting_upload" or "validating" or "queued" or "processing" or "ready" or "manual_ready")||!matchingImages)
+                    throw new DomainException(409,"receipt_exists","This receipt already exists.");
+                var migrated=existing with{ScanRequested=false,Version=existing.Version+1};
+                return new(new{existing.Id},[StoreMutation.Condition(groupRow.Pk,groupRow.Sk,groupRow.Version),StoreMutation.Put(StoreRow.Create(existingRow.Pk,existingRow.Sk,migrated.Version,migrated),existingRow.Version)]);
+            }
             var now=DateTimeOffset.UtcNow;var receipt=new ReceiptRecord(input.Id,groupId,actor.User.Id,group.Members.Single(m=>m.UserId==actor.User.Id&&!m.HasLeft&&!m.IsDeleted).Id,
-                "awaiting_upload",input.ScanRequested,input.Images.Select(x=>new ReceiptUploadSlot(x.Id,$"quarantine/{input.Id}/{x.Id}",x.ContentType,x.SizeBytes,x.Sha256.ToLowerInvariant())).ToArray(),[],now,now.AddDays(1));
+                "awaiting_upload",false,input.Images.Select(x=>new ReceiptUploadSlot(x.Id,$"quarantine/{input.Id}/{x.Id}",x.ContentType,x.SizeBytes,x.Sha256.ToLowerInvariant())).ToArray(),[],now,now.AddDays(1));
             return new(new {receipt.Id},[
                 await new ReceiptUploadAdmission(store,config).ReserveAsync(receipt,ct),
                 StoreMutation.Condition(groupRow.Pk,groupRow.Sk,groupRow.Version),
@@ -58,7 +63,7 @@ public sealed class ReceiptService(IAtomicStore store, CommandExecutor commands,
         {
             var row=await access.ReceiptAsync(actor,id,true,ct);var receipt=row.Deserialize<ReceiptRecord>();ReceiptAccess.Version(receipt,input.Version);
             if(receipt.State!="awaiting_upload"||receipt.ExpiresAt<=DateTimeOffset.UtcNow)throw new DomainException(409,"receipt_state_invalid","This upload is already sealed or expired.");
-            var updated=receipt with{State="validating",Version=receipt.Version+1,Generation=receipt.Generation+1};
+            var updated=receipt with{State="validating",ScanRequested=false,Version=receipt.Version+1,Generation=receipt.Generation+1};
             return new(new{updated.Id,updated.State,updated.Version},[StoreMutation.Put(StoreRow.Create(row.Pk,row.Sk,updated.Version,updated),row.Version),StoreMutation.Put(StoreRow.Create("WORK#receipt-scan",id,1,new ReceiptWork(id,DateTimeOffset.UtcNow)),null)]);
         },ct);
     }
@@ -72,17 +77,7 @@ public sealed class ReceiptService(IAtomicStore store, CommandExecutor commands,
             media=receipt.ImagesRemoved?[]:receipt.Media.Select(x=>new{x.Id,x.ContentType,x.SizeBytes,x.Width,x.Height,x.ThumbnailSizeBytes}).ToArray(),extraction};
     }
     public async Task<JsonElement> RetryAsync(Actor actor,string key,string id,ReceiptVersionRequest input,CancellationToken ct)
-    {
-        await access.ReceiptAsync(actor,id,true,ct);
-        return await commands.ExecuteAsync(actor,key,$"receipts:retry:{id}",input,async()=>
-        {
-            var row=await access.ReceiptAsync(actor,id,true,ct);var receipt=row.Deserialize<ReceiptRecord>();ReceiptAccess.Version(receipt,input.Version);
-            if(receipt.State!="failed"||receipt.ExpenseId is not null||receipt.Attempts>=3||receipt.Media.Count==0||receipt.ImagesRemoved)throw new DomainException(409,"receipt_retry_unavailable","Enter the bill manually with the photo attached.");
-            var allowance=await quotas.AllowanceAsync(actor.User.Id,ct);if(!allowance.ScanAvailable)throw new DomainException(402,allowance.Reason!,"Enter manually or try scanning later.");var next=receipt with{QuotaMonth=null,ReservationHeld=false,State="queued",Generation=receipt.Generation+1,Version=receipt.Version+1,ErrorCode=null,LeaseToken=null,LeaseUntil=null};
-            var work=await store.GetAsync("WORK#receipt-scan",id,ct);var writes=new List<StoreMutation>();writes.Add(StoreMutation.Put(StoreRow.Create(row.Pk,row.Sk,next.Version,next),row.Version));writes.Add(StoreMutation.Put(StoreRow.Create("WORK#receipt-scan",id,(work?.Version??0)+1,new ReceiptWork(id,DateTimeOffset.UtcNow)),work?.Version));
-            return new(new{next.Id,next.State,next.Version},writes);
-        },ct);
-    }
+    { await access.EnsureSessionAsync(actor,ct); throw ScanningRemoved(); }
     public async Task<object> TicketAsync(Actor actor,string id,CancellationToken ct)
     {
         var receipt=(await access.ReceiptAsync(actor,id,false,ct)).Deserialize<ReceiptRecord>();

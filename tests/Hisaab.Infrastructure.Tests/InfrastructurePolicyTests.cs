@@ -84,7 +84,7 @@ public sealed class InfrastructurePolicyTests
             var routes = resources.EnumerateObject()
                 .Where(resource => resource.Value.GetProperty("Type").GetString() == "AWS::ApiGatewayV2::Route")
                 .ToDictionary(resource => resource.Value.GetProperty("Properties").GetProperty("RouteKey").GetString()!);
-            Assert.Equal(4, routes.Count);
+            Assert.Equal(3, routes.Count);
             template.ResourceCountIs("AWS::ApiGatewayV2::Integration", 1);
             var defaultRoute = routes["$default"].Value.GetProperty("Properties");
             var apiStage = resources.EnumerateObject()
@@ -95,12 +95,11 @@ public sealed class InfrastructurePolicyTests
             Assert.Equal(100, defaults.GetProperty("ThrottlingBurstLimit").GetInt32());
             Assert.Equal(50, defaults.GetProperty("ThrottlingRateLimit").GetInt32());
             var routeSettings = stageProperties.GetProperty("RouteSettings");
-            Assert.Equal(3, routeSettings.EnumerateObject().Count());
+            Assert.Equal(2, routeSettings.EnumerateObject().Count());
             foreach (var routeKey in new[]
             {
                 "POST /v1/groups/{groupId}/receipts",
-                "POST /v1/receipts/{id}/complete",
-                "POST /v1/receipts/{id}/retry"
+                "POST /v1/receipts/{id}/complete"
             })
             {
                 var route = routes[routeKey];
@@ -129,6 +128,8 @@ public sealed class InfrastructurePolicyTests
                 if (type == "AWS::DynamoDB::Table")
                     Assert.Equal("Retain", resource.Value.GetProperty("DeletionPolicy").GetString());
             }
+            Assert.DoesNotContain("ReceiptBudget80", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("ReceiptCircuitOpen", json, StringComparison.Ordinal);
             Assert.DoesNotContain("dynamodb:Scan", json, StringComparison.Ordinal);
             Assert.Contains("secretsmanager:GetSecretValue", json, StringComparison.Ordinal);
             Assert.Contains("HasConfigurationSecret", json, StringComparison.Ordinal);

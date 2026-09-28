@@ -43,7 +43,7 @@ builder.Services.AddSingleton<CommandExecutor>(); builder.Services.AddSingleton<
 builder.Services.AddSingleton<AccountDeletionService>(); builder.Services.AddSingleton<BackgroundJobs>();
 builder.Services.AddSingleton<PushService>();
 builder.Services.AddSingleton<ReceiptAccess>(); builder.Services.AddSingleton<ReceiptDocuments>();
-builder.Services.AddSingleton<ReceiptQuotaService>(); builder.Services.AddSingleton<ReceiptBudgetService>();
+builder.Services.AddSingleton<ReceiptQuotaService>();
 builder.Services.AddSingleton<ReceiptAttachmentService>(); builder.Services.AddSingleton<ReceiptService>();
 builder.Services.AddSingleton<ReceiptLifecycle>(); builder.Services.AddSingleton<ReceiptWorker>();
 builder.Services.AddReceiptInfrastructure(builder.Configuration, builder.Environment);

@@ -11,16 +11,16 @@ public sealed class ApiRateLimitOptions
     public int AuthRequestsPerIpPerMinute { get; set; } = 30;
     public int RequestsPerAccountPerMinute { get; set; } = 240;
     public int AuthRequestsPerAccountPerMinute { get; set; } = 30;
-    public int AiRequestsPerIpPerMinute { get; set; } = 30;
-    public int AiRequestsPerAccountPerMinute { get; set; } = 12;
+    public int ReceiptRequestsPerIpPerMinute { get; set; } = 30;
+    public int ReceiptRequestsPerAccountPerMinute { get; set; } = 12;
 
     public bool IsValid() => new[] { RequestsPerIpPerMinute, AuthRequestsPerIpPerMinute,
         RequestsPerAccountPerMinute, AuthRequestsPerAccountPerMinute,
-        AiRequestsPerIpPerMinute, AiRequestsPerAccountPerMinute }.All(value => value is >= 1 and <= 10000);
+        ReceiptRequestsPerIpPerMinute, ReceiptRequestsPerAccountPerMinute }.All(value => value is >= 1 and <= 10000);
 }
 
-/// <summary>Apply to every endpoint that can create, submit or retry AI work.</summary>
-public sealed class AiRequestRateLimit;
+/// <summary>Apply to endpoints that create or submit receipt uploads.</summary>
+public sealed class ReceiptWriteRateLimit;
 
 public sealed class ApiRateLimits(DistributedRateLimiter limiter, IOptions<ApiRateLimitOptions> options)
 {
@@ -32,7 +32,7 @@ public sealed class ApiRateLimits(DistributedRateLimiter limiter, IOptions<ApiRa
         var source = Source(context.Connection.RemoteIpAddress);
         var limits = new List<RequestRateLimit> { new("ip", source, policy.RequestsPerIpPerMinute) };
         if (IsAuth(context)) limits.Add(new("auth-ip", source, policy.AuthRequestsPerIpPerMinute));
-        if (IsAi(context)) limits.Add(new("ai-ip", source, policy.AiRequestsPerIpPerMinute));
+        if (IsReceiptWrite(context)) limits.Add(new("receipt-ip", source, policy.ReceiptRequestsPerIpPerMinute));
         return await AdmitAsync(context, limits);
     }
 
@@ -41,7 +41,7 @@ public sealed class ApiRateLimits(DistributedRateLimiter limiter, IOptions<ApiRa
         var policy = options.Value;
         var limits = new List<RequestRateLimit> { new("account", actor.User.Id, policy.RequestsPerAccountPerMinute) };
         if (IsAuth(context)) limits.Add(new("auth-account", actor.User.Id, policy.AuthRequestsPerAccountPerMinute));
-        if (IsAi(context)) limits.Add(new("ai-account", actor.User.Id, policy.AiRequestsPerAccountPerMinute));
+        if (IsReceiptWrite(context)) limits.Add(new("receipt-account", actor.User.Id, policy.ReceiptRequestsPerAccountPerMinute));
         return await AdmitAsync(context, limits);
     }
 
@@ -58,7 +58,7 @@ public sealed class ApiRateLimits(DistributedRateLimiter limiter, IOptions<ApiRa
     }
 
     private static bool IsAuth(HttpContext context) => context.Request.Path.StartsWithSegments("/v1/auth", StringComparison.OrdinalIgnoreCase);
-    private static bool IsAi(HttpContext context) => context.GetEndpoint()?.Metadata.GetMetadata<AiRequestRateLimit>() is not null;
+    private static bool IsReceiptWrite(HttpContext context) => context.GetEndpoint()?.Metadata.GetMetadata<ReceiptWriteRateLimit>() is not null;
 
     internal static string Source(IPAddress? address)
     {

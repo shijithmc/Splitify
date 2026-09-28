@@ -25,7 +25,7 @@ public sealed class ReceiptFunction
                 if (!record.TryGetProperty("eventSource", out var source)) throw new InvalidDataException("Missing receipt event source.");
                 if (source.GetString() == "aws:dynamodb")
                 {
-                    // Streams dispatch identifiers only. The SQS invocation performs inference.
+                    // Streams dispatch identifiers only. The SQS invocation normalizes uploaded images.
                     var keys = record.GetProperty("dynamodb").GetProperty("Keys");
                     if (keys.GetProperty("PK").GetProperty("S").GetString() != "WORK#receipt-scan") continue;
                     var id = keys.GetProperty("SK").GetProperty("S").GetString();
@@ -52,22 +52,5 @@ public sealed class ReceiptFunction
             // Repair lost stream notifications and expired leases using the durable, paged cursor.
             await worker.RunAsync(ct: budget.Token);
         }
-        await EmitHealthAsync(host.Services.GetRequiredService<IAtomicStore>(), context, budget.Token);
-    }
-    private static async Task EmitHealthAsync(IAtomicStore store, ILambdaContext context, CancellationToken ct)
-    {
-        var row = await store.GetAsync("RECEIPT_BUDGET", DateTimeOffset.UtcNow.ToString("yyyyMM", System.Globalization.CultureInfo.InvariantCulture), ct);
-        var budget = row?.Deserialize<ReceiptBudget>();
-        // EMF contains only aggregate operational values, never receipt/account identifiers or content.
-        context.Logger.LogLine(JsonSerializer.Serialize(new
-        {
-            _aws = new { Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), CloudWatchMetrics = new[] { new
-            {
-                Namespace = "Hisaab/Receipts", Dimensions = new[] { Array.Empty<string>() },
-                Metrics = new[] { new { Name = "Budget80", Unit = "Count" }, new { Name = "CircuitOpen", Unit = "Count" } }
-            } } },
-            Budget80 = budget?.Alarm80 == true ? 1 : 0,
-            CircuitOpen = budget?.CircuitUntil > DateTimeOffset.UtcNow ? 1 : 0
-        }));
     }
 }
