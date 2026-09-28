@@ -122,6 +122,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('archived-only accounts retain outstanding totals and history', (
+    tester,
+  ) async {
+    final c = await demo(tester);
+    c.groups = [summary('Old home', 'Home', archived: true)];
+    c.balances = {
+      'netPaise': 12300,
+      'owedPaise': 15000,
+      'owingPaise': 2700,
+      'friends': [],
+    };
+    await tester.pumpWidget(HisaabApp(controller: c));
+    expect(find.text('₹150.00'), findsOneWidget);
+    expect(find.text('₹27.00'), findsOneWidget);
+    expect(find.text('Your next shared moment starts here.'), findsNothing);
+    expect(find.text('Settle up'), findsNothing);
+    await tester.tap(find.text('View balances'));
+    await tester.pumpAndSettle();
+    expect(find.text('Old home'), findsOneWidget);
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Archived'))
+          .selected,
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('activity has quick expense entry and offline disables it', (
     tester,
   ) async {

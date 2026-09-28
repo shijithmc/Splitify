@@ -235,22 +235,76 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
   }
 
   Future<void> flag() async {
-    final reason = await showDialog<String>(
+    var selected = 'total';
+    final reason = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('What doesn’t match?'),
-        children: [
-          for (final reason in {
-            'total': 'Total amount',
-            'items': 'Items or assignments',
-            'image': 'Bill image',
-            'other': 'Something else',
-          }.entries)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, reason.key),
-              child: Text(reason.value),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const EditorialArtwork(asset: HisaabArt.receipt, height: 110),
+                const SizedBox(height: 12),
+                Text(
+                  'Something doesn’t add up?',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tell the payer what needs checking.',
+                  style: TextStyle(color: HisaabColors.muted),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Column(
+                    children: [
+                      for (final entry in {
+                        'total': 'Total amount',
+                        'items': 'Items or assignments',
+                        'image': 'Bill image',
+                        'other': 'Something else',
+                      }.entries)
+                        Semantics(
+                          checked: selected == entry.key,
+                          child: ListTile(
+                            selected: selected == entry.key,
+                            selectedTileColor: HisaabColors.lilac,
+                            leading: Icon(
+                              selected == entry.key
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_off,
+                            ),
+                            title: Text(entry.value),
+                            onTap: () => update(() => selected = entry.key),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Reporting won’t change anyone’s balance.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: HisaabColors.muted, fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, selected),
+                  child: const Text('Report mismatch'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
     if (reason == null || !mounted) return;
@@ -367,24 +421,45 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
                     Container(
                       padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
-                        color: HisaabColors.mint,
+                        color: HisaabColors.lilac,
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          const Text('Reviewed bill total'),
-                          const SizedBox(height: 6),
-                          Text(
-                            money(document['grandTotalPaise']),
-                            style: Theme.of(context).textTheme.headlineLarge
-                                ?.copyWith(color: HisaabColors.teal),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Reviewed bill total'),
+                                const SizedBox(height: 6),
+                                Text(
+                                  money(document['grandTotalPaise']),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineLarge,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  widget.group.name,
+                                  style: const TextStyle(
+                                    color: HisaabColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            widget.group.name,
-                            style: const TextStyle(color: HisaabColors.teal),
-                          ),
+                          if (MediaQuery.sizeOf(context).width >= 360 &&
+                              MediaQuery.textScalerOf(context).scale(16) <=
+                                  22) ...[
+                            const SizedBox(width: 8),
+                            const SizedBox(
+                              width: 90,
+                              child: EditorialArtwork(
+                                asset: HisaabArt.receipt,
+                                height: 100,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -405,7 +480,7 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
                           child: ColoredBox(
                             color: HisaabColors.line,
                             child: SizedBox(
-                              height: 380,
+                              height: 300,
                               child: images[media['id']] == null
                                   ? const Center(
                                       child: CircularProgressIndicator(),
@@ -500,7 +575,7 @@ class _ReceiptViewerPageState extends State<ReceiptViewerPage>
                   if (object(revision['shares']).isNotEmpty) ...[
                     const SectionTitle('Confirmed shares'),
                     Card(
-                      color: HisaabColors.lilac,
+                      color: HisaabColors.mint,
                       child: Column(
                         children: object(revision['shares']).entries
                             .map(

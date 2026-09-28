@@ -217,4 +217,101 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'add-person sheet validates a name and stays usable above keyboard',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final controller = AppController();
+      await controller.startDemo();
+      final groupId = controller.groups.first.id;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: HisaabTheme.light,
+          home: GroupPage(controller: controller, groupId: groupId),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Group options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, 'Add person'));
+      await tester.pumpAndSettle();
+      final add = find.widgetWithText(FilledButton, 'Add person');
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.text('Enter their name to add them.'), findsOneWidget);
+      final name = find.widgetWithText(TextField, 'Name');
+      await tester.ensureVisible(name);
+      await tester.enterText(name, 'A new friend');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      tester.view.resetViewInsets();
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final group = Group.from(
+        await controller.request('GET', '/groups/$groupId'),
+      );
+      expect(
+        group.members.any((member) => member.name == 'A new friend'),
+        isTrue,
+      );
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    },
+  );
+
+  testWidgets('offline group options explain why changes are unavailable', (
+    tester,
+  ) async {
+    final controller = _OfflineDemoController();
+    await controller.startDemo();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: HisaabTheme.light,
+        home: GroupPage(
+          controller: controller,
+          groupId: controller.groups.first.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Add expense'),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byTooltip('Group options'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ListTile>(find.widgetWithText(ListTile, 'Invite')).enabled,
+      isFalse,
+    );
+    expect(
+      find.text('Reconnect to make changes. Your saved history is still here.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+}
+
+class _OfflineDemoController extends AppController {
+  @override
+  bool get offline => true;
 }

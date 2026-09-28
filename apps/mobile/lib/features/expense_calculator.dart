@@ -72,7 +72,7 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
     }
     final result = amount;
     return Scaffold(
-      appBar: AppBar(title: const Text('Calculator')),
+      appBar: AppBar(title: const Text('Quick calculator')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -92,6 +92,11 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
                     minLines: 1,
                     maxLines: 3,
                     maxLength: maxCalculatorExpressionLength,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w500,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Calculation in rupees',
                       hintText: 'e.g. 240 + 60 ÷ 2',
@@ -110,20 +115,28 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: HisaabColors.surface,
-                      borderRadius: BorderRadius.circular(12),
+                      color: HisaabColors.lilac,
+                      borderRadius: BorderRadius.circular(26),
                     ),
                     child: Semantics(
                       liveRegion: true,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Total'),
+                          const Text(
+                            'Make it add up',
+                            style: TextStyle(color: HisaabColors.muted),
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             result == null ? '—' : money(result),
                             key: const Key('calculator-result'),
-                            style: Theme.of(context).textTheme.headlineMedium,
+                            style: Theme.of(context).textTheme.headlineLarge
+                                ?.copyWith(
+                                  fontSize: 42,
+                                  letterSpacing: -1.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -196,11 +209,14 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
       key: Key('calculator-key-$value'),
       onPressed: value == '⌫' ? _delete : () => _insert(value),
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(48, 56),
+        minimumSize: const Size(48, 64),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-        backgroundColor: ['÷', '×', '−', '+'].contains(value)
-            ? HisaabColors.mint
-            : Colors.white,
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: value == '⌫' ? HisaabColors.peach : HisaabColors.lilac,
+        foregroundColor: ['÷', '×', '−', '+'].contains(value)
+            ? HisaabColors.primary
+            : HisaabColors.ink,
       ),
       child: value == '⌫'
           ? const Icon(
@@ -210,7 +226,7 @@ class _ExpenseCalculatorPageState extends State<ExpenseCalculatorPage> {
           : Text(
               value,
               semanticsLabel: label,
-              style: const TextStyle(fontSize: 22),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
             ),
     );
   }

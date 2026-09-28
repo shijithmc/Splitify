@@ -152,7 +152,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     listenable: c,
     builder: (context, _) => Scaffold(
       appBar: AppBar(
-        title: Text(group?.name ?? 'Your circle'),
+        title: const Text('Groups'),
         actions: [
           if (group != null && !group!.archived)
             IconButton(
@@ -161,40 +161,10 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               icon: const Icon(Icons.attach_file_rounded),
             ),
           if (group != null)
-            PopupMenuButton<String>(
+            IconButton(
               tooltip: 'Group options',
-              onSelected: options,
-              itemBuilder: (_) => [
-                if (!group!.archived) ...[
-                  PopupMenuItem(
-                    value: 'member',
-                    enabled: !c.offline,
-                    child: const Text('Add person'),
-                  ),
-                  PopupMenuItem(
-                    value: 'invite',
-                    enabled: !c.offline,
-                    child: const Text('Invite'),
-                  ),
-                  const PopupMenuDivider(),
-                ],
-                const PopupMenuItem(
-                  value: 'rename',
-                  child: Text('Rename group'),
-                ),
-                PopupMenuItem(
-                  value: 'archive',
-                  child: Text(
-                    group!.archived ? 'Reopen group' : 'Archive group',
-                  ),
-                ),
-                const PopupMenuItem(value: 'leave', child: Text('Leave group')),
-                if (group!.creatorId == c.userId)
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete group'),
-                  ),
-              ],
+              onPressed: showOptions,
+              icon: const Icon(Icons.more_horiz_rounded),
             ),
         ],
       ),
@@ -235,58 +205,159 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                   const SizedBox(height: 8),
                   _summary(),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final (index, label) in [
-                        'Expenses',
-                        'Balances',
-                        'Payments',
-                      ].indexed)
-                        ChoiceChip(
-                          label: Text(label),
-                          selected: section == index,
-                          onSelected: (_) => setState(() => section = index),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  _sectionPicker(),
+                  const SizedBox(height: 12),
                   ...switch (section) {
                     0 => _expenseList(),
                     1 => _balanceList(),
                     _ => _paymentList(),
                   },
-                  const SizedBox(height: 90),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
-      floatingActionButton: group == null || group!.archived
+      bottomNavigationBar: group == null
           ? null
-          : FloatingActionButton.extended(
-              onPressed: c.offline ? null : () => editExpense(),
-              icon: const Icon(Icons.add),
-              label: const Text('Add expense'),
+          : SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: FilledButton.icon(
+                onPressed: c.offline
+                    ? null
+                    : group!.archived
+                    ? () => options('archive')
+                    : section == 1
+                    ? openSettlement
+                    : () => editExpense(),
+                icon: Icon(
+                  group!.archived
+                      ? Icons.unarchive_outlined
+                      : section == 1
+                      ? Icons.handshake_outlined
+                      : Icons.add_circle_outline_rounded,
+                ),
+                label: Text(
+                  group!.archived
+                      ? 'Reopen group'
+                      : section == 1
+                      ? 'Settle up'
+                      : 'Add expense',
+                ),
+              ),
             ),
     ),
   );
+
+  Widget _sectionPicker() => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: HisaabColors.lilac.withValues(alpha: .5),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final chips = [
+          for (final (index, label) in [
+            'Expenses',
+            'Balances',
+            'Payments',
+          ].indexed)
+            ChoiceChip(
+              label: Text(label),
+              selected: section == index,
+              showCheckmark: false,
+              side: BorderSide.none,
+              backgroundColor: Colors.transparent,
+              selectedColor: HisaabColors.lilac,
+              labelStyle: TextStyle(
+                color: section == index
+                    ? HisaabColors.primary
+                    : HisaabColors.muted,
+                fontWeight: section == index
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+              ),
+              onSelected: (_) => setState(() => section = index),
+            ),
+        ];
+        if (constraints.maxWidth < 320 ||
+            MediaQuery.textScalerOf(context).scale(14) > 17) {
+          return Wrap(spacing: 4, runSpacing: 4, children: chips);
+        }
+        return Row(children: [for (final chip in chips) Expanded(child: chip)]);
+      },
+    ),
+  );
+
   Widget _summary() {
     final g = group!;
     final me = g.participant(c.userId);
     final net = me == null ? 0 : g.netFor(me);
     final hasBalances = me != null && g.pairs(me).values.any((v) => v != 0);
-    final type = g.type == 'Direct' ? 'With a friend' : g.type;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
-            style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+    final type = g.type == 'Direct' ? 'Just you two' : g.type;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        EditorialArtwork(
+          asset: g.type == 'Home'
+              ? HisaabArt.home
+              : g.type == 'Trip'
+              ? HisaabArt.trip
+              : HisaabArt.sharing,
+          height: 128,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(height: 12),
+        Text(g.name, style: Theme.of(context).textTheme.headlineLarge),
+        const SizedBox(height: 4),
+        Text(
+          '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
+          style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
+        ),
+        if (g.archived)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'History stays here. Reopen the group to add expenses.',
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 48,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: g.members.length + (g.archived ? 0 : 1),
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              if (index == g.members.length) {
+                return IconButton.filledTonal(
+                  tooltip: 'Add person',
+                  onPressed: c.offline ? null : addMember,
+                  icon: const Icon(Icons.add),
+                );
+              }
+              final member = g.members[index];
+              final name = member.userId == c.userId
+                  ? 'You'
+                  : g.memberName(member.id);
+              return Tooltip(
+                message: name,
+                child: Semantics(
+                  label: name,
+                  child: ExcludeSemantics(child: _MemberAvatar(member, index)),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: net < 0 ? HisaabColors.peach : HisaabColors.mint,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
             children: [
               Expanded(
                 child: Column(
@@ -300,7 +371,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                           : net > 0
                           ? 'You get back'
                           : 'You owe',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     if (net != 0)
                       FittedBox(
@@ -309,35 +380,44 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                         child: Text(
                           money(net.abs()),
                           style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 32,
                             color: net < 0
                                 ? HisaabColors.warning
                                 : HisaabColors.positive,
                           ),
                         ),
                       ),
+                    if (net == 0 && hasBalances) ...[
+                      const SizedBox(height: 6),
+                      const Text(
+                        'You owe and are owed the same amount. Check Balances before settling up.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: HisaabColors.muted,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (!g.archived)
+              if (!g.archived && section != 1) ...[
+                const SizedBox(width: 8),
                 TextButton(
                   onPressed: c.offline ? null : openSettlement,
                   child: const Text('Settle up'),
                 ),
+              ],
+              if (g.archived && !hasBalances && net == 0)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: HisaabColors.positive,
+                  size: 32,
+                ),
             ],
           ),
-          if (g.archived || (net == 0 && hasBalances)) ...[
-            const SizedBox(height: 12),
-            Text(
-              g.archived
-                  ? 'Reopen the group to add expenses.'
-                  : 'You owe and are owed the same amount. Check Balances before settling up.',
-              style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -356,6 +436,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     if (expenses.isEmpty)
       EmptyCard(
         icon: Icons.receipt_long_outlined,
+        illustrationAsset: HisaabArt.sharing,
         title: 'No expenses yet',
         body: 'Add a bill, choose who paid, and split it with your group.',
         action: group!.archived
@@ -370,9 +451,9 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       Material(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(
-          top: index == 0 ? const Radius.circular(12) : Radius.zero,
+          top: index == 0 ? const Radius.circular(18) : Radius.zero,
           bottom: index == expenses.length - 1
-              ? const Radius.circular(12)
+              ? const Radius.circular(18)
               : Radius.zero,
         ),
         clipBehavior: Clip.antiAlias,
@@ -387,14 +468,14 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               leading: e.receiptId != null && !e.deleted
                   ? ReceiptThumbnail(controller: c, receiptId: e.receiptId!)
                   : CircleAvatar(
-                      radius: 18,
+                      radius: 22,
                       backgroundColor: e.deleted
                           ? HisaabColors.surface
-                          : HisaabColors.mint,
+                          : HisaabColors.peach,
                       child: Icon(
                         e.deleted
                             ? Icons.delete_outline
-                            : Icons.receipt_long_outlined,
+                            : _expenseIcon(e.description),
                         color: HisaabColors.teal,
                       ),
                     ),
@@ -424,6 +505,11 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                   ),
                 ],
               ),
+              trailing: const Icon(
+                Icons.chevron_right_rounded,
+                color: HisaabColors.muted,
+                size: 20,
+              ),
               onTap: () => expenseDetails(e),
             ),
           ],
@@ -433,6 +519,13 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       TextButton(onPressed: loadMore, child: const Text('Load older expenses')),
   ];
   List<Widget> _balanceList() => [
+    const Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: Text(
+        'See who owes whom, at a glance.',
+        style: TextStyle(color: HisaabColors.muted),
+      ),
+    ),
     ...group!.members.map((m) {
       final net = group!.netFor(m.id);
       final hasBalances = group!.pairs(m.id).values.any((v) => v != 0);
@@ -529,7 +622,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               ),
             if (m.placeholder && !group!.archived)
               TextButton(
-                onPressed: () => invite(m.id),
+                onPressed: c.offline ? null : () => invite(m.id),
                 child: const Text('Invite to claim this balance'),
               ),
           ],
@@ -538,9 +631,11 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     }),
   ];
   List<Widget> _paymentList() => [
+    if (settlements.isNotEmpty) const SectionTitle('Payment history'),
     if (settlements.isEmpty)
       const EmptyCard(
         icon: Icons.handshake_outlined,
+        illustrationAsset: HisaabArt.together,
         title: 'No payments recorded',
         body: 'Paid them back? Record the amount and method here.',
       ),
@@ -548,16 +643,37 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       (p) => Card(
         margin: const EdgeInsets.only(bottom: 10),
         child: ListTile(
-          isThreeLine: true,
-          leading: Icon(
-            p['disputed'] == true ? Icons.undo : Icons.check_circle_outline,
-            color: p['disputed'] == true ? clay : green,
+          leading: CircleAvatar(
+            backgroundColor: p['disputed'] == true
+                ? HisaabColors.peach
+                : HisaabColors.mint,
+            child: Icon(
+              p['disputed'] == true ? Icons.undo : Icons.check_rounded,
+              color: p['disputed'] == true
+                  ? HisaabColors.warning
+                  : HisaabColors.positive,
+            ),
           ),
           title: Text(
-            '${group!.memberName(p['fromId'])} → ${group!.memberName(p['toId'])}',
+            '${group!.memberName(p['fromId'])} paid ${group!.memberName(p['toId'])}',
           ),
-          subtitle: Text(
-            '${money(p['amountPaise'])} · ${p['method']}\n${p['disputed'] == true ? 'Disputed · balance reversed' : 'Payment recorded'}',
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                money(p['amountPaise']),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: p['disputed'] == true
+                      ? HisaabColors.warning
+                      : HisaabColors.positive,
+                ),
+              ),
+              Text(
+                '${p['method']} · ${p['disputed'] == true ? 'Disputed · balance reversed' : 'Payment recorded'}',
+              ),
+            ],
           ),
           trailing:
               p['disputed'] != true && p['toId'] == group!.participant(c.userId)
@@ -591,65 +707,72 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
       ),
     ),
   ];
-  Future<void> addMember() async {
-    final name = TextEditingController(),
-        email = TextEditingController(),
-        phone = TextEditingController();
-    final member = await showDialog<Json>(
+  Future<void> showOptions() async {
+    final g = group!;
+    final action = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add someone'),
-        content: SingleChildScrollView(
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: name,
-                maxLength: 100,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: email,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email (optional)',
+              Text(g.name, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 16),
+              for (final entry in [
+                if (!g.archived) ...[
+                  ('member', 'Add person', Icons.person_add_alt_1_outlined),
+                  ('invite', 'Invite', Icons.send_outlined),
+                ],
+                ('rename', 'Rename group', Icons.edit_outlined),
+                (
+                  'archive',
+                  g.archived ? 'Reopen group' : 'Archive group',
+                  Icons.inventory_2_outlined,
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phone,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Phone (optional)',
+                ('leave', 'Leave group', Icons.logout_rounded),
+                if (g.creatorId == c.userId)
+                  ('delete', 'Delete group', Icons.delete_outline_rounded),
+              ])
+                ListTile(
+                  enabled: !c.offline,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    entry.$3,
+                    color: entry.$1 == 'delete'
+                        ? HisaabColors.warning
+                        : HisaabColors.primary,
+                  ),
+                  title: Text(entry.$2),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(context, entry.$1),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'A name is enough to start. A verified email or a private invitation link lets them claim their shared history. Phone numbers alone never grant access.',
-                style: TextStyle(fontSize: 14, height: 1.5),
-              ),
+              if (c.offline)
+                const _GroupNote(
+                  icon: Icons.wifi_off_rounded,
+                  text:
+                      'Reconnect to make changes. Your saved history is still here.',
+                ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (name.text.trim().isEmpty) return;
-              Navigator.pop(context, {
-                'displayName': name.text.trim(),
-                if (email.text.trim().isNotEmpty) 'email': email.text.trim(),
-                if (phone.text.trim().isNotEmpty) 'phone': phone.text.trim(),
-              });
-            },
-            child: const Text('Add person'),
-          ),
-        ],
       ),
+    );
+    if (action != null && mounted) await options(action);
+  }
+
+  Future<void> addMember() async {
+    if (c.offline || group!.archived) return;
+    final member = await showModalBottomSheet<Json>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const _AddPersonSheet(),
     );
     if (member == null || !mounted) return;
     await act(context, () async {
@@ -660,69 +783,108 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
   }
 
   Future<void> invite([String? participantId]) async {
+    if (c.offline || group!.archived) return;
     await act(context, () async {
       final invite = await c.request('POST', '/groups/${group!.id}/invites', {
         'participantId': ?participantId,
       });
       if (!mounted) return;
       final link = invite['url'] as String;
-      await showDialog<void>(
+      await showModalBottomSheet<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('An invitation to your circle'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Only share this private link with the person you want to invite.',
-              ),
-              const SizedBox(height: 16),
-              SelectableText(link),
-              const SizedBox(height: 12),
-              Text(
-                'Expires ${invite['expiresAt'].toString().split('T').first}',
-                style: const TextStyle(fontSize: 14),
-              ),
-            ],
-          ),
-          actions: [
-            if (group!.creatorId == c.userId)
-              TextButton(
-                onPressed: () => act(ctx, () async {
-                  await c.request(
-                    'POST',
-                    '/groups/${group!.id}/invites/revoke',
-                    {'token': invite['token']},
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) message(context, 'Invitation revoked.');
-                }),
-                child: const Text('Revoke'),
-              ),
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: link));
-                message(context, 'Invitation copied');
-              },
-              child: const Text('Copy'),
-            ),
-            FilledButton.icon(
-              onPressed: () async {
-                final box = ctx.findRenderObject() as RenderBox?;
-                await SharePlus.instance.share(
-                  ShareParams(
-                    text: 'Join my Hisaab circle: $link',
-                    sharePositionOrigin: box == null
-                        ? null
-                        : box.localToGlobal(Offset.zero) & box.size,
+        showDragHandle: true,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (ctx) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Save them a spot',
+                  style: Theme.of(ctx).textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 6),
+                const Text('Share an invitation to your circle.'),
+                const SizedBox(height: 16),
+                const EditorialArtwork(asset: HisaabArt.together, height: 152),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: GroupArtwork(type: group!.type, size: 52),
+                  title: Text(group!.name),
+                  subtitle: Text('${group!.members.length} people'),
+                ),
+                const SectionTitle('Private invitation'),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: HisaabColors.lilac,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                );
-              },
-              icon: const Icon(Icons.share),
-              label: const Text('Share'),
+                  child: SelectableText(link),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Expires ${invite['expiresAt'].toString().split('T').first}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: HisaabColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: link));
+                    if (mounted) message(context, 'Invitation copied');
+                  },
+                  icon: const Icon(Icons.copy_outlined),
+                  label: const Text('Copy link'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final box = ctx.findRenderObject() as RenderBox?;
+                    await SharePlus.instance.share(
+                      ShareParams(
+                        text: 'Join my Hisaab circle: $link',
+                        sharePositionOrigin: box == null
+                            ? null
+                            : box.localToGlobal(Offset.zero) & box.size,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.ios_share_rounded),
+                  label: const Text('Share'),
+                ),
+                const SizedBox(height: 16),
+                const _GroupNote(
+                  icon: Icons.lock_outline_rounded,
+                  text:
+                      'Only share this private link with the person you want to invite.',
+                ),
+                if (group!.creatorId == c.userId)
+                  TextButton(
+                    onPressed: () => act(ctx, () async {
+                      await c.request(
+                        'POST',
+                        '/groups/${group!.id}/invites/revoke',
+                        {'token': invite['token']},
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) message(context, 'Invitation revoked.');
+                    }),
+                    style: TextButton.styleFrom(
+                      foregroundColor: HisaabColors.warning,
+                    ),
+                    child: const Text('Revoke invitation'),
+                  ),
+              ],
             ),
-          ],
+          ),
         ),
       );
     });
@@ -746,6 +908,17 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (e.deleted) ...[
+                  const _GroupNote(
+                    icon: Icons.delete_outline_rounded,
+                    text:
+                        'Deleted · this expense is no longer included in balances.',
+                    warning: true,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                const EditorialArtwork(asset: HisaabArt.receipt, height: 128),
+                const SizedBox(height: 16),
                 Text(
                   e.description,
                   style: const TextStyle(
@@ -754,7 +927,20 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text('${money(e.amount)} · ${e.displayMode} · ${e.date}'),
+                Text(
+                  money(e.amount),
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${group!.memberName(e.payer)} paid · ${e.displayMode} · ${e.date}',
+                  style: const TextStyle(color: HisaabColors.muted),
+                ),
+                const SizedBox(height: 12),
+                const _GroupNote(
+                  icon: Icons.lock_outline_rounded,
+                  text: 'Visible to this group',
+                ),
                 if (e.receiptId != null)
                   TextButton.icon(
                     onPressed: () => Navigator.pop(context, 'receipt'),
@@ -765,6 +951,18 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                 ...e.shares.entries.map(
                   (share) => ListTile(
                     contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: HisaabColors.lilac,
+                      foregroundColor: HisaabColors.primary,
+                      child: Text(
+                        group!
+                                .memberName(share.key)
+                                .characters
+                                .firstOrNull
+                                ?.toUpperCase() ??
+                            '?',
+                      ),
+                    ),
                     title: Text(group!.memberName(share.key)),
                     trailing: Text(money(share.value)),
                   ),
@@ -1024,6 +1222,7 @@ class _SettlementPageState extends State<SettlementPage> {
           children: [
             EmptyCard(
               icon: Icons.check_circle_outline,
+              illustrationAsset: HisaabArt.together,
               title: hasBalances
                   ? 'No payments for you to record'
                   : 'Everyone is settled up',
@@ -1046,45 +1245,37 @@ class _SettlementPageState extends State<SettlementPage> {
           Expanded(
             child: PageBody(
               children: [
+                const EditorialArtwork(asset: HisaabArt.together, height: 120),
+                const SizedBox(height: 16),
+                Text(
+                  'Clear between friends',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 4),
                 Text(g.name, style: const TextStyle(color: HisaabColors.muted)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 22,
-                        color: HisaabColors.ink,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Record a payment you have already made. Hisaab does not move money.',
-                          style: TextStyle(
-                            height: 1.5,
-                            color: HisaabColors.ink,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 16),
+                const _GroupNote(
+                  icon: Icons.info_outline_rounded,
+                  text:
+                      'Record a payment you have already made. Hisaab does not move money.',
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: amount,
+                  enabled: !saving,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
                   style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
                     color: HisaabColors.ink,
                   ),
                   decoration: const InputDecoration(
                     labelText: 'Amount paid',
                     prefixText: '₹ ',
                     suffixText: 'INR',
+                    fillColor: HisaabColors.lilac,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1160,7 +1351,9 @@ class _SettlementPageState extends State<SettlementPage> {
                           }, size: 20),
                           label: Text(value),
                           selected: method == value,
-                          onSelected: (_) => setState(() => method = value),
+                          onSelected: saving
+                              ? null
+                              : (_) => setState(() => method = value),
                         ),
                       )
                       .toList(),
@@ -1227,4 +1420,187 @@ class _SettlementPageState extends State<SettlementPage> {
       if (mounted) setState(() => saving = false);
     }
   }
+}
+
+IconData _expenseIcon(String description) {
+  final value = description.toLowerCase();
+  if (RegExp(r'coffee|café|cafe|tea').hasMatch(value)) {
+    return Icons.local_cafe_outlined;
+  }
+  if (RegExp(r'taxi|cab|uber|ride|fuel').hasMatch(value)) {
+    return Icons.local_taxi_outlined;
+  }
+  if (RegExp(r'dinner|lunch|breakfast|food|meal|restaurant').hasMatch(value)) {
+    return Icons.restaurant_rounded;
+  }
+  if (RegExp(r'home|rent|electric|internet').hasMatch(value)) {
+    return Icons.home_outlined;
+  }
+  if (RegExp(r'trip|flight|hotel|travel').hasMatch(value)) {
+    return Icons.luggage_outlined;
+  }
+  return Icons.receipt_long_outlined;
+}
+
+class _MemberAvatar extends StatelessWidget {
+  final Member member;
+  final int index;
+  const _MemberAvatar(this.member, this.index);
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+    radius: 24,
+    backgroundColor: [
+      HisaabColors.lilac,
+      HisaabColors.peach,
+      HisaabColors.mint,
+    ][index % 3],
+    foregroundColor: HisaabColors.ink,
+    child: Text(
+      member.deleted
+          ? '?'
+          : member.name.characters.firstOrNull?.toUpperCase() ?? '?',
+      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+    ),
+  );
+}
+
+class _GroupNote extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool warning;
+  const _GroupNote({
+    required this.icon,
+    required this.text,
+    this.warning = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: warning ? HisaabColors.peach : HisaabColors.lilac,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: warning ? HisaabColors.warning : HisaabColors.primary,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text, style: const TextStyle(fontSize: 14, height: 1.4)),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AddPersonSheet extends StatefulWidget {
+  const _AddPersonSheet();
+
+  @override
+  State<_AddPersonSheet> createState() => _AddPersonSheetState();
+}
+
+class _AddPersonSheetState extends State<_AddPersonSheet> {
+  final name = TextEditingController();
+  final email = TextEditingController();
+  final phone = TextEditingController();
+  String? error;
+
+  @override
+  void dispose() {
+    name.dispose();
+    email.dispose();
+    phone.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Flexible(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Who’s joining?',
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Add a friend to your group.'),
+                  const SizedBox(height: 16),
+                  const EditorialArtwork(asset: HisaabArt.sharing, height: 136),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: name,
+                    maxLength: 100,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'Name',
+                      errorText: error,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: email,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Email (optional)',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone (optional)',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const _GroupNote(
+                    icon: Icons.lightbulb_outline_rounded,
+                    text:
+                        'Start with a name. A verified email or a private invitation lets them claim their shared history. Adding a phone number does not give access.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: FilledButton(
+              onPressed: () {
+                if (name.text.trim().isEmpty) {
+                  setState(() => error = 'Enter their name to add them.');
+                  return;
+                }
+                Navigator.pop(context, {
+                  'displayName': name.text.trim(),
+                  if (email.text.trim().isNotEmpty) 'email': email.text.trim(),
+                  if (phone.text.trim().isNotEmpty) 'phone': phone.text.trim(),
+                });
+              },
+              child: const Text('Add person'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

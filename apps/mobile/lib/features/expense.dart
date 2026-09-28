@@ -111,21 +111,32 @@ class _ExpensePageState extends State<ExpensePage> {
           Expanded(
             child: PageBody(
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.people_outline,
-                      size: 20,
-                      color: HisaabColors.teal,
+                Card(
+                  color: HisaabColors.lilac,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        GroupArtwork(type: g.type, size: 46),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                g.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              Text(
+                                '$peopleSummary · A little fairer, together',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        g.name,
-                        style: const TextStyle(color: HisaabColors.muted),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Card(
@@ -159,8 +170,9 @@ class _ExpensePageState extends State<ExpensePage> {
                           decimal: true,
                         ),
                         style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 38,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1.5,
                           color: HisaabColors.ink,
                         ),
                         decoration: InputDecoration(
@@ -185,6 +197,9 @@ class _ExpensePageState extends State<ExpensePage> {
                                       );
                                     }
                                   },
+                            style: IconButton.styleFrom(
+                              backgroundColor: HisaabColors.lilac,
+                            ),
                             icon: const Icon(Icons.calculate_outlined),
                           ),
                           filled: false,
@@ -259,7 +274,7 @@ class _ExpensePageState extends State<ExpensePage> {
                     ],
                   ),
                 ),
-                const SectionTitle('Split expense'),
+                const SectionTitle('How should we split?'),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -294,6 +309,7 @@ class _ExpensePageState extends State<ExpensePage> {
                             : m.name;
                         return CheckboxListTile(
                           title: Text(name),
+                          secondary: _ExpensePerson(name: name),
                           value: selected.contains(m.id),
                           controlAffinity: ListTileControlAffinity.leading,
                           onChanged: m.left || m.deleted
@@ -339,11 +355,19 @@ class _ExpensePageState extends State<ExpensePage> {
                                           }),
                                   ),
                                   Expanded(
-                                    child: Text(
-                                      name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                    child: Row(
+                                      children: [
+                                        _ExpensePerson(name: name),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   if (included) ...[
@@ -392,6 +416,11 @@ class _ExpensePageState extends State<ExpensePage> {
                   ),
                 const SizedBox(height: 14),
                 Card(
+                  color: shares != null
+                      ? HisaabColors.mint
+                      : amount.text.isEmpty
+                      ? HisaabColors.lilac
+                      : HisaabColors.peach,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -409,13 +438,17 @@ class _ExpensePageState extends State<ExpensePage> {
                               size: 20,
                               color: shares == null && amount.text.isNotEmpty
                                   ? HisaabColors.warning
-                                  : HisaabColors.muted,
+                                  : HisaabColors.positive,
                             ),
                             const SizedBox(width: 10),
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Split preview',
-                                style: TextStyle(fontWeight: FontWeight.w600),
+                                shares != null
+                                    ? 'Every share, clear'
+                                    : 'Split preview',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
@@ -604,4 +637,22 @@ class _ExpensePageState extends State<ExpensePage> {
       if (mounted) setState(() => saving = false);
     }
   }
+}
+
+class _ExpensePerson extends StatelessWidget {
+  final String name;
+  const _ExpensePerson({required this.name});
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: CircleAvatar(
+      radius: 18,
+      backgroundColor: HisaabColors.lilac,
+      foregroundColor: HisaabColors.primary,
+      child: Text(
+        name.characters.firstOrNull?.toUpperCase() ?? '?',
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+      ),
+    ),
+  );
 }
