@@ -3,11 +3,20 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hisaab/core/config.dart';
+import 'package:hisaab/core/controller.dart';
 import 'package:hisaab/core/models.dart';
+import 'package:hisaab/core/native_services.dart';
 import 'package:hisaab/core/phone_auth.dart';
 import 'package:hisaab/core/repository.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PhoneTestBilling extends BillingService {
+  @override
+  Future<void> signOut() async {}
+}
 
 Json phoneSession(String account, {String token = 'current-token'}) => {
   'accessToken': token,
@@ -35,6 +44,7 @@ void main() {
 
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({});
     requests = [];
     current = true;
     respond = (request) async {
@@ -65,6 +75,54 @@ void main() {
     );
   });
   tearDown(() => repository.close());
+
+  test('logout clears a pending loading state', () async {
+    final controller = AppController(billing: PhoneTestBilling())
+      ..repository = repository
+      ..loading = true;
+    addTearDown(controller.dispose);
+    await controller.logout(deleted: true);
+    expect(controller.signedIn, isFalse);
+    expect(controller.loading, isFalse);
+    expect(controller.error, isNull);
+  });
+
+  for (final lateFailure in [false, true]) {
+    test(
+      'logout during phone login ignores a late ${lateFailure ? 'error' : 'cancellation'} and clears loading',
+      () async {
+        final controller = AppController(billing: PhoneTestBilling())
+          ..repository = repository
+          ..loading = false;
+        addTearDown(controller.dispose);
+        final response = Completer<Json?>();
+        final started = Completer<void>();
+        final pending = controller.loginPhone((_) {
+          started.complete();
+          return response.future;
+        });
+        await started.future;
+        expect(controller.loading, isTrue);
+        await controller.logout(deleted: true);
+        if (lateFailure) {
+          response.completeError(ApiFailure('Previous sign-in failed.'));
+        } else {
+          response.complete(null);
+        }
+        await pending;
+        expect(controller.signedIn, isFalse);
+        expect(controller.loading, isFalse);
+        expect(controller.error, isNull);
+        expect(
+          await const FlutterSecureStorage().read(key: 'hisaab.session'),
+          isNull,
+        );
+      },
+      // Exercise the configured login path with a MockClient using
+      // --dart-define=API_BASE_URL=https://example.invalid.
+      skip: !AppConfig.configured,
+    );
+  }
 
   test(
     'normalizes international phone numbers and rejects ambiguous input',

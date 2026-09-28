@@ -195,7 +195,7 @@ class AppController extends ChangeNotifier {
     } on IdentityCancelled {
       // Closing the native account chooser returns to sign-in without an error.
     } catch (e) {
-      error = '$e';
+      if (epoch == _accountEpoch) error = '$e';
     }
     if (epoch == _accountEpoch) {
       loading = false;
@@ -408,6 +408,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout({bool deleted = false}) async {
     ++_accountEpoch;
+    loading = false;
     pendingNotification = null;
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
