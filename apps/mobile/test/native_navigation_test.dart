@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisaab/features/group.dart';
 import 'package:hisaab/main.dart';
@@ -28,6 +29,16 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      // The compact hero and balances depend on the shipped font metrics.
+      await tester.runAsync(() async {
+        for (final family in ['Outfit', 'WorkSans']) {
+          final loader = FontLoader(family);
+          for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+            loader.addFont(rootBundle.load('assets/fonts/$family-$weight.ttf'));
+          }
+          await loader.load();
+        }
+      });
       final c = await demo(tester);
       await tester.pumpWidget(HisaabApp(controller: c));
       final isIOS =

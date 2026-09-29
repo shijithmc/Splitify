@@ -29,6 +29,7 @@ abstract final class HisaabArt {
   static const tripScene = 'assets/illustrations/trip-scene-v3.webp';
   static const home = 'assets/illustrations/home-v3.webp';
   static const receipt = 'assets/illustrations/receipt-v3.webp';
+  static const wallet = 'assets/illustrations/wallet-v1.webp';
   static const together = 'assets/illustrations/together-v3.webp';
 
   static String forGroup(String type) => switch (type) {

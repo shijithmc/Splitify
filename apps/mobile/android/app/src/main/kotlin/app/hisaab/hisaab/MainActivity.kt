@@ -15,8 +15,17 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 class MainActivity : FlutterActivity() {
+    private var spendingNative: SpendingNative? = null
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        spendingNative?.onRequestPermissionsResult(requestCode)
+    }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        spendingNative = SpendingNative(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.hisaab/spending")
+            .setMethodCallHandler(spendingNative)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.hisaab/receipts")
             .setMethodCallHandler { call, result ->
                 if (call.method != "rasterize") { result.notImplemented(); return@setMethodCallHandler }

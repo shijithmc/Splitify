@@ -26,6 +26,12 @@
     {
       "file": "receipt-v3.webp",
       "prompt": "Use case: illustration-story. Generate ONE isolated tiny mobile UI illustration of a smiling paper receipt mascot. Absolutely NO humans, NO human faces, NO people, NO hands holding it, NO crowd, NO plants, NO other props. The sole object is a white receipt with scalloped paper edges, two small black dot eyes and a small curved black smile drawn ON the paper. Two very tiny dark stick arms wave from the paper's sides. A few simple pale gray horizontal line marks on the paper, NO text, NO letters, NO numbers or currency. One tiny terracotta orange accent stroke above it. Flat clean 2D vector-like friendly editorial style, simple rounded shapes and minimal gray outline. Square canvas. Fully transparent background and generous 10% clear margin. Receipt fills 80% of canvas height. Easy to recognize at 64px. No scene, no shadows, no frame, no watermark."
+    },
+    {
+      "file": "wallet-v1.webp",
+      "prompt": "Use case: illustration-story. Create one original warm flat editorial app illustration of a friendly terracotta leather wallet, slightly open, with a small sage green sprout growing behind it and one butter-yellow coin peeking out. Soft rounded shapes, subtly textured paper, tiny expressive black eyes and a relaxed smile, simple stitch detail. Warm approachable feeling matching the approved HiSaab personal spending mockup. Cream #FFFBF4 background, no borders, text, letters or currency symbols. Entire wallet and sprout fit comfortably with 10% margin, landscape 3:2 composition. Readable at 100 pixels. One asset only, no UI, phones or logo.",
+      "tool": "built-in image_gen",
+      "encoding": "600x400 WebP, quality88, alpha preserved"
     }
   ]
 }
