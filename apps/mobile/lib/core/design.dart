@@ -3,32 +3,33 @@ import 'package:flutter/material.dart';
 
 /// Shared colors and controls for the native mobile screens.
 abstract final class HisaabColors {
-  static const primary = Color(0xFF7252DF);
-  static const deep = Color(0xFF332554);
-  static const ink = Color(0xFF27233B);
-  static const muted = Color(0xFF696477);
-  static const surface = Color(0xFFFCFAF7);
+  static const primary = Color(0xFFB44025);
+  static const deep = Color(0xFF35392F);
+  static const ink = Color(0xFF292A25);
+  static const muted = Color(0xFF606458);
+  static const surface = Color(0xFFFFFBF4);
   static const teal = primary;
-  static const lime = Color(0xFFE8F2BA);
-  static const mint = Color(0xFFDFF3E7);
-  static const peach = Color(0xFFFFE5D7);
-  static const lilac = Color(0xFFEEE9FC);
-  static const line = Color(0xFFEAE6EE);
-  static const positive = Color(0xFF176B50);
-  static const warning = Color(0xFFAF432A);
-  static const balanceAmount = Color(0xFF27233B);
-  static const illustrationBackground = Color(0xFFFCFAF7);
-  static const fieldBorder = Color(0xFFDDD7E7);
+  static const lime = Color(0xFFF9E6AD);
+  static const mint = Color(0xFFE4EEDB);
+  static const peach = Color(0xFFFFDEC8);
+  static const lilac = Color(0xFFF2ECE4);
+  static const line = Color(0xFFE5DFD5);
+  static const positive = Color(0xFF326346);
+  static const warning = Color(0xFFAA3C24);
+  static const balanceAmount = ink;
+  static const illustrationBackground = surface;
+  static const fieldBorder = Color(0xFFD8D1C7);
 }
 
 /// Locally bundled editorial illustrations; no network requests on UI paths.
 abstract final class HisaabArt {
-  static const welcome = 'assets/illustrations/welcome-v2.png';
-  static const sharing = 'assets/illustrations/sharing-v2.png';
-  static const trip = 'assets/illustrations/trip-v2.png';
-  static const home = 'assets/illustrations/home-v2.png';
-  static const receipt = 'assets/illustrations/receipt-v2.png';
-  static const together = 'assets/illustrations/together-v2.png';
+  static const welcome = together;
+  static const sharing = 'assets/illustrations/sharing-v3.webp';
+  static const trip = 'assets/illustrations/trip-v3.webp';
+  static const tripScene = 'assets/illustrations/trip-scene-v3.webp';
+  static const home = 'assets/illustrations/home-v3.webp';
+  static const receipt = 'assets/illustrations/receipt-v3.webp';
+  static const together = 'assets/illustrations/together-v3.webp';
 
   static String forGroup(String type) => switch (type) {
     'Trip' => trip,
@@ -42,6 +43,8 @@ abstract final class HisaabTheme {
   static ThemeData get light {
     final base = ThemeData(
       useMaterial3: true,
+      fontFamily: 'WorkSans',
+      fontFamilyFallback: const ['WorkSans'],
       scaffoldBackgroundColor: HisaabColors.surface,
       colorScheme: ColorScheme.fromSeed(
         seedColor: HisaabColors.primary,
@@ -64,7 +67,7 @@ abstract final class HisaabTheme {
       borderRadius: BorderRadius.circular(18),
     );
     return base.copyWith(
-      // Rounded display type adds character; body and controls keep native fonts.
+      // Rounded display type and readable body text match the illustrated UI.
       cupertinoOverrideTheme: const CupertinoThemeData(
         primaryColor: HisaabColors.primary,
         scaffoldBackgroundColor: HisaabColors.surface,
@@ -193,7 +196,7 @@ abstract final class HisaabTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         extendedTextStyle: text.labelLarge?.copyWith(
-          fontSize: 14,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -241,13 +244,19 @@ abstract final class HisaabTheme {
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: Colors.white,
-        selectedColor: HisaabColors.lilac,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: const BorderSide(color: HisaabColors.line),
+        backgroundColor: HisaabColors.lilac,
+        selectedColor: HisaabColors.primary,
+        checkmarkColor: Colors.white,
+        showCheckmark: false,
+        shape: const StadiumBorder(),
+        side: BorderSide.none,
         labelStyle: text.labelLarge?.copyWith(
           fontSize: 13,
-          color: HisaabColors.ink,
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? Colors.white
+                : HisaabColors.ink,
+          ),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       ),
