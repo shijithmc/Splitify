@@ -12,6 +12,7 @@ import '../core/repository.dart';
 import '../main.dart';
 import 'shared.dart';
 import 'phone_sign_in.dart';
+import 'spending.dart';
 
 Future<void> openLink(BuildContext context, String url) async {
   if (url.isEmpty) {
@@ -84,6 +85,14 @@ class SettingsPage extends StatelessWidget {
         Card(
           child: Column(
             children: [
+              _AccountRow(
+                icon: Icons.account_balance_wallet_outlined,
+                color: HisaabColors.lime,
+                title: 'Personal spending',
+                subtitle: 'Private budgets, imports and data export',
+                onTap: () => openPage(context, c, SpendingPage(controller: c)),
+              ),
+              const _AccountDivider(),
               _AccountRow(
                 icon: Icons.notifications_rounded,
                 title: 'Notifications',

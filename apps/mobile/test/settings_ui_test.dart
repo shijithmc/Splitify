@@ -96,10 +96,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('scans left'), findsNothing);
       await tester.scrollUntilVisible(
+        find.text('Personal spending'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Personal spending').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Personal spending'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your spending'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
         find.text('Notifications'),
         250,
         scrollable: find.byType(Scrollable).first,
       );
+      // The final ensureVisible jump needs a frame to lay out the tall card.
+      await tester.pumpAndSettle();
+      expect(find.text('Notifications').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Notifications'));
       await tester.pumpAndSettle();
       expect(find.text('Stay in the loop'), findsOneWidget);

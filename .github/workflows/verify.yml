@@ -47,3 +47,5 @@ jobs:
         run: flutter test test/ad_lifecycle_test.dart --dart-define=ADS_ENABLED=true --dart-define=ADS_POLICY_REVIEWED=true --dart-define=ADMOB_ANDROID_BANNER_ID=test-banner
       - working-directory: apps/mobile
         run: flutter build apk --debug --dart-define=ENABLE_DEMO=true
+      - working-directory: apps/mobile/android
+        run: ./gradlew :app:testDebugUnitTest

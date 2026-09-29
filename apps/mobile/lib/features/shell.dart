@@ -14,6 +14,7 @@ import 'shared.dart';
 import 'receipts.dart';
 import 'receipt_viewer.dart';
 import 'phone_sign_in.dart';
+import 'spending.dart';
 
 class AppShell extends StatefulWidget {
   final AppController controller;
@@ -447,19 +448,39 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ),
           ),
         ] else ...[
-          Text(
-            'Made for\nsharing.',
-            style: Theme.of(context).textTheme.displaySmall,
-          ),
           LayoutBuilder(
             builder: (context, constraints) {
               final compact =
                   constraints.maxWidth < 340 ||
                   MediaQuery.textScalerOf(context).scale(1) > 1.3;
-              return EditorialArtwork(
-                asset: HisaabArt.sharing,
-                height: compact ? 112 : 156,
-                borderRadius: BorderRadius.zero,
+              final heading = Text(
+                'Made for\nsharing.',
+                style: Theme.of(context).textTheme.displaySmall,
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    heading,
+                    const EditorialArtwork(
+                      asset: HisaabArt.sharing,
+                      height: 112,
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: heading),
+                  const Expanded(
+                    child: EditorialArtwork(
+                      asset: HisaabArt.sharing,
+                      height: 120,
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                ],
               );
             },
           ),
@@ -520,6 +541,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ],
             ),
           ),
+          if (activeGroups.isNotEmpty) SpendingHomeCard(controller: c),
           if (activeGroups.isNotEmpty)
             SectionTitle(
               'Your groups',
@@ -543,6 +565,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ),
             ),
         ],
+        if (activeGroups.isEmpty) SpendingHomeCard(controller: c),
         if (rows(c.balances['friends']).isNotEmpty) ...[
           const SectionTitle('Balances with friends'),
           Card(

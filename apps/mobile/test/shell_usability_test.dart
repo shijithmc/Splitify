@@ -104,6 +104,14 @@ void main() {
     };
     c.notifyListeners();
     await tester.pumpAndSettle();
+    // Resizing preserves the previous scroll offset; bring the now-shorter
+    // balance card back into the lazy viewport before measuring its layout.
+    await tester.scrollUntilVisible(
+      owed,
+      -120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(
       tester.getTopLeft(owed).dy,
       closeTo(tester.getTopLeft(owing).dy, .01),

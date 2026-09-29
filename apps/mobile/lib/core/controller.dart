@@ -10,14 +10,210 @@ import 'models.dart';
 import 'native_services.dart';
 import 'repository.dart';
 import 'receipts.dart';
+import 'spending.dart';
+import 'spending_import.dart';
 
 class AppController extends ChangeNotifier {
   Repository? repository;
   final identity = IdentityService();
   final BillingService billing;
-  AppController({BillingService? billing})
-    : billing = billing ?? BillingService();
+  final SpendingImportService spendingImports;
+  AppController({
+    BillingService? billing,
+    SpendingImportService? spendingImports,
+  }) : billing = billing ?? BillingService(),
+       spendingImports = spendingImports ?? SpendingImportService();
   int _accountEpoch = 0;
+  SpendingController? _spending;
+  Repository? _spendingRepository;
+  bool _spendingClosing = false;
+  Timer? _spendingPoll;
+  bool _importingSpending = false;
+  bool _clearingSpending = false;
+  int _spendingGeneration = 0;
+  bool _refreshingSpendingLinks = false;
+  String? spendingImportError;
+  bool get spendingAvailable => signedIn && !_spendingClosing;
+  SpendingController get spending {
+    if (_spendingClosing) {
+      // Retain the already-cleared instance during native shutdown. A rebuild
+      // must never lazily reopen the previous account's encrypted ledger.
+      if (_spending != null) return _spending!;
+      throw StateError('Personal spending session is changing.');
+    }
+    if (_spending != null &&
+        (_spending!.account != userId ||
+            !identical(_spendingRepository, repository))) {
+      unawaited(_spending!.endSession());
+      _spending = null;
+    }
+    _spendingRepository = repository;
+    return _spending ??= SpendingController(account: userId, demo: demo);
+  }
+
+  Future<void> _initializeSpending() async {
+    if (!signedIn) return;
+    if (_spendingClosing) {
+      _spending = null;
+      _spendingRepository = null;
+      _spendingClosing = false;
+    }
+    final epoch = _accountEpoch;
+    final personal = spending;
+    await personal.initialize();
+    if (epoch != _accountEpoch || !signedIn) return;
+    try {
+      await spendingImports.configureOwner(demo ? null : userId);
+      if (epoch != _accountEpoch || !signedIn) return;
+      if (!demo) await syncSpendingSms();
+    } catch (_) {
+      // Manual entries and local statements work without the SMS bridge.
+    }
+    if (epoch != _accountEpoch || !signedIn) return;
+    _spendingPoll?.cancel();
+    if (!demo) {
+      _spendingPoll = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (foreground && signedIn) unawaited(syncSpendingSms());
+      });
+    }
+  }
+
+  Future<int> syncSpendingSms({bool requestPermission = false}) async {
+    if (!spendingAvailable || demo || _importingSpending || _clearingSpending) {
+      return 0;
+    }
+    final epoch = _accountEpoch;
+    final generation = _spendingGeneration;
+    final personal = spending;
+    _importingSpending = true;
+    try {
+      if (!spendingImports.supportsSms) return 0;
+      if (!requestPermission && !await spendingImports.smsEnabled()) return 0;
+      final records = await spendingImports.importSms(
+        requestPermission: requestPermission,
+      );
+      if (epoch != _accountEpoch ||
+          generation != _spendingGeneration ||
+          !signedIn) {
+        return 0;
+      }
+      final added = await personal.importRows(records);
+      if (epoch != _accountEpoch ||
+          generation != _spendingGeneration ||
+          !signedIn) {
+        return added;
+      }
+      await spendingImports.acknowledgeSms();
+      spendingImportError = null;
+      return added;
+    } catch (e) {
+      if (epoch == _accountEpoch) spendingImportError = '$e';
+      if (requestPermission) rethrow;
+      return 0;
+    } finally {
+      _importingSpending = false;
+    }
+  }
+
+  Future<void> clearPrivateSpending() async {
+    final personal = spending;
+    final epoch = _accountEpoch;
+    ++_spendingGeneration;
+    _clearingSpending = true;
+    try {
+      await spendingImports.disableSms();
+      if (epoch != _accountEpoch) return;
+      await spendingImports.clearImportedData();
+      if (epoch != _accountEpoch) return;
+      await personal.clear(discardPending: true);
+      spendingImportError = null;
+      notifyListeners();
+    } finally {
+      _clearingSpending = false;
+    }
+  }
+
+  Future<void> refreshSpendingLinks() async {
+    if (_spending == null ||
+        !spendingAvailable ||
+        offline ||
+        _refreshingSpendingLinks) {
+      return;
+    }
+    _refreshingSpendingLinks = true;
+    final personal = _spending!;
+    final epoch = _accountEpoch;
+    try {
+      for (final row in personal.transactions.where(
+        (t) => t['expenseId'] != null,
+      )) {
+        if (epoch != _accountEpoch || !signedIn || offline) return;
+        var review = false;
+        int? share;
+        try {
+          final group = groups.where((g) => g.id == row['groupId']).firstOrNull;
+          final me = group?.participant(userId);
+          if (me == null) {
+            review = true;
+          } else {
+            final expense = Expense(
+              await request(
+                'GET',
+                '/groups/${row['groupId']}/expenses/${row['expenseId']}',
+              ),
+            );
+            if (epoch != _accountEpoch || !signedIn || offline) return;
+            review =
+                expense.deleted ||
+                expense.payer != me ||
+                expense.amount != row['amountPaise'];
+            if (!review) share = expense.shares[me] ?? 0;
+          }
+        } on ApiFailure catch (e) {
+          if (epoch != _accountEpoch || !signedIn) return;
+          if (e.status == 403 || e.status == 404) {
+            review = true;
+          } else {
+            continue;
+          }
+        }
+        if (epoch != _accountEpoch || !signedIn) return;
+        if ((row['linkNeedsReview'] == true) != review ||
+            (share != null && row['sharePaise'] != share)) {
+          await personal.update(row['id'], {
+            'linkNeedsReview': review,
+            'sharePaise': ?share,
+          });
+        }
+      }
+    } catch (_) {
+      // A failed refresh never replaces confirmed local data with a guess.
+    } finally {
+      _refreshingSpendingLinks = false;
+    }
+  }
+
+  Future<void> _closeSpending({bool delete = false}) async {
+    ++_spendingGeneration;
+    _spendingClosing = true;
+    _spendingPoll?.cancel();
+    _spendingPoll = null;
+    final personal = _spending;
+    final closing = personal?.endSession(delete: delete);
+    spendingImportError = null;
+    notifyListeners();
+    try {
+      if (delete) {
+        await spendingImports.disableSms();
+        await spendingImports.clearImportedData();
+      }
+      await spendingImports.configureOwner(null);
+    } catch (_) {
+      // Unsupported platforms still close the encrypted local store.
+    }
+    await closing;
+  }
+
   ReceiptCoordinator? _receipts;
   ReceiptCoordinator get receipts {
     final repo = repository!;
@@ -114,6 +310,8 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _nativeIdentity() async {
+    if (!signedIn) return;
+    await _initializeSpending();
     if (demo || !signedIn) return;
     final account = userId;
     final epoch = _accountEpoch;
@@ -185,6 +383,7 @@ class AppController extends ChangeNotifier {
       final session = await verify(repo);
       if (epoch != _accountEpoch) return;
       if (session != null) {
+        await _closeSpending();
         await repo.saveSession(session);
         repository = repo;
         user = object(session['user']);
@@ -204,6 +403,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> startDemo() async {
+    await _closeSpending();
     await _receipts?.endSession();
     _receipts = null;
     ++_accountEpoch;
@@ -213,6 +413,7 @@ class AppController extends ChangeNotifier {
     repository = await DemoRepository.open();
     user = object(repository!.session!['user']);
     await refresh();
+    await _initializeSpending();
     loading = false;
     notifyListeners();
   }
@@ -259,6 +460,9 @@ class AppController extends ChangeNotifier {
     final repo = repository!;
     try {
       final result = await repo.request(method, path, data);
+      if (method != 'GET' && path.startsWith('/groups/')) {
+        unawaited(refreshSpendingLinks());
+      }
       notifyListeners();
       return result;
     } on ApiFailure catch (e) {
@@ -387,6 +591,8 @@ class AppController extends ChangeNotifier {
     } else {
       _scheduleBillingRetry();
       if (_receipts != null) unawaited(_receipts!.pump());
+      if (_spending != null) unawaited(syncSpendingSms());
+      if (_spending != null) unawaited(refreshSpendingLinks());
     }
   }
 
@@ -402,6 +608,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout({bool deleted = false}) async {
     ++_accountEpoch;
+    await _closeSpending(delete: deleted);
     loading = false;
     pendingNotification = null;
     PaintingBinding.instance.imageCache.clear();
@@ -431,6 +638,9 @@ class AppController extends ChangeNotifier {
       await repo.close();
     }
     user = {};
+    _spending = null;
+    _spendingRepository = null;
+    _spendingClosing = false;
     entitlement = {};
     preferences = {};
     balances = {};
@@ -444,6 +654,8 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _spendingPoll?.cancel();
+    unawaited(_spending?.endSession() ?? Future<void>.value());
     _billingRetry?.cancel();
     _provisionalExpiry?.cancel();
     unawaited(inviteLinks.dispose());
