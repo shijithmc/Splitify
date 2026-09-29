@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisaab/core/controller.dart';
 import 'package:hisaab/core/design.dart';
 import 'package:hisaab/core/models.dart';
+import 'package:hisaab/core/money.dart';
+import 'package:hisaab/features/expense.dart';
 import 'package:hisaab/features/group.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+Future<void> loadBundledFonts(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    for (final family in ['Outfit', 'WorkSans']) {
+      final loader = FontLoader(family);
+      for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+        loader.addFont(rootBundle.load('assets/fonts/$family-$weight.ttf'));
+      }
+      await loader.load();
+    }
+  });
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -201,22 +216,141 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No net balance'), findsOneWidget);
     expect(find.text('You are settled up'), findsNothing);
-    for (final label in ['You lent ₹50.00', 'Your share ₹50.00']) {
+    for (final description in ['lunch', 'dinner']) {
       tester
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position
           .jumpTo(0);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text(label),
+        find.text(description),
         160,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text(label), findsOneWidget);
+      final expense = find
+          .ancestor(of: find.text(description), matching: find.byType(InkWell))
+          .first;
+      expect(
+        find.descendant(of: expense, matching: find.text('Your share ₹50.00')),
+        findsOneWidget,
+      );
+      if (description == 'lunch') {
+        expect(
+          find.descendant(of: expense, matching: find.text('You lent ₹50.00')),
+          findsOneWidget,
+        );
+      }
     }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('add expense stays anchored from balances with larger text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final controller = AppController();
+    await controller.startDemo();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: HisaabTheme.light,
+        home: GroupPage(
+          controller: controller,
+          groupId: controller.groups.first.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final add = find.widgetWithText(FilledButton, 'Add expense');
+    expect(add.hitTestable(), findsOneWidget);
+    final balances = find.widgetWithText(ChoiceChip, 'Balances');
+    await tester.scrollUntilVisible(
+      balances,
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(balances);
+    await tester.pumpAndSettle();
+    await tester.tap(balances);
+    await tester.pumpAndSettle();
+    expect(add.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(find.byType(ExpensePage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
+  for (final display in [(390.0, 1.0), (320.0, 1.6)]) {
+    testWidgets('large group balance stays whole at $display', (tester) async {
+      await loadBundledFonts(tester);
+      tester.view.physicalSize = Size(display.$1, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = display.$2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final controller = AppController();
+      await controller.startDemo();
+      final created = await controller.request('POST', '/groups', {
+        'name': 'Big trip',
+        'type': 'Trip',
+      });
+      final groupId = created['id'];
+      final me = created['members'][0]['id'];
+      final alex = (await controller.request(
+        'POST',
+        '/groups/$groupId/members',
+        {'displayName': 'Alex'},
+      ))['id'];
+      await controller.request('POST', '/groups/$groupId/expenses', {
+        'id': 'large-expense',
+        'description': 'Trip booking',
+        'date': '2026-09-29',
+        'amountPaise': maxAmountPaise,
+        'payerId': me,
+        'mode': 'Equal',
+        'participants': [
+          {'participantId': alex, 'value': 1},
+        ],
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: HisaabTheme.light,
+          home: GroupPage(controller: controller, groupId: groupId),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final amount = find.byKey(const ValueKey('group-balance-amount'));
+      final settle = find.widgetWithText(OutlinedButton, 'Settle up');
+      await tester.scrollUntilVisible(
+        settle,
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(settle);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(amount).data, money(maxAmountPaise));
+      final topLeft = tester.getTopLeft(amount);
+      final bottomLeft = tester.getBottomLeft(amount);
+      final bottomRight = tester.getBottomRight(amount);
+      expect(topLeft.dx, greaterThanOrEqualTo(20));
+      expect(bottomRight.dx, lessThanOrEqualTo(display.$1 - 20));
+      expect(bottomLeft.dy - topLeft.dy, greaterThanOrEqualTo(28));
+      expect(bottomLeft.dy, lessThan(tester.getTopLeft(settle).dy));
+      expect(settle.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    });
+  }
 
   testWidgets(
     'add-person sheet validates a name and stays usable above keyboard',

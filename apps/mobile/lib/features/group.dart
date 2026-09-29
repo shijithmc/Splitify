@@ -152,14 +152,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     listenable: c,
     builder: (context, _) => Scaffold(
       appBar: AppBar(
-        title: const Text('Groups'),
         actions: [
-          if (group != null && !group!.archived)
-            IconButton(
-              tooltip: 'Attach receipt',
-              onPressed: c.offline ? null : attachReceipt,
-              icon: const Icon(Icons.attach_file_rounded),
-            ),
           if (group != null)
             IconButton(
               tooltip: 'Group options',
@@ -204,7 +197,7 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                     Text(error!, style: const TextStyle(color: clay)),
                   const SizedBox(height: 8),
                   _summary(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
                   _sectionPicker(),
                   const SizedBox(height: 12),
                   ...switch (section) {
@@ -220,28 +213,29 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
           ? null
           : SafeArea(
               top: false,
-              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: FilledButton.icon(
-                onPressed: c.offline
-                    ? null
-                    : group!.archived
-                    ? () => options('archive')
-                    : section == 1
-                    ? openSettlement
-                    : () => editExpense(),
-                icon: Icon(
-                  group!.archived
-                      ? Icons.unarchive_outlined
-                      : section == 1
-                      ? Icons.handshake_outlined
-                      : Icons.add_circle_outline_rounded,
-                ),
-                label: Text(
-                  group!.archived
-                      ? 'Reopen group'
-                      : section == 1
-                      ? 'Settle up'
-                      : 'Add expense',
+              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: Center(
+                heightFactor: 1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: c.offline
+                          ? null
+                          : group!.archived
+                          ? () => options('archive')
+                          : () => editExpense(),
+                      icon: Icon(
+                        group!.archived
+                            ? Icons.unarchive_outlined
+                            : Icons.add_rounded,
+                      ),
+                      label: Text(
+                        group!.archived ? 'Reopen group' : 'Add expense',
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -249,10 +243,8 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
   );
 
   Widget _sectionPicker() => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: HisaabColors.lilac.withValues(alpha: .5),
-      borderRadius: BorderRadius.circular(16),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: HisaabColors.line)),
     ),
     child: LayoutBuilder(
       builder: (context, constraints) {
@@ -262,22 +254,34 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
             'Balances',
             'Payments',
           ].indexed)
-            ChoiceChip(
-              label: Text(label),
-              selected: section == index,
-              showCheckmark: false,
-              side: BorderSide.none,
-              backgroundColor: Colors.transparent,
-              selectedColor: HisaabColors.lilac,
-              labelStyle: TextStyle(
-                color: section == index
-                    ? HisaabColors.primary
-                    : HisaabColors.muted,
-                fontWeight: section == index
-                    ? FontWeight.w700
-                    : FontWeight.w500,
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    width: 3,
+                    color: section == index
+                        ? HisaabColors.primary
+                        : Colors.transparent,
+                  ),
+                ),
               ),
-              onSelected: (_) => setState(() => section = index),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: section == index,
+                showCheckmark: false,
+                side: BorderSide.none,
+                backgroundColor: Colors.transparent,
+                selectedColor: Colors.transparent,
+                labelStyle: TextStyle(
+                  color: section == index
+                      ? HisaabColors.primary
+                      : HisaabColors.muted,
+                  fontWeight: section == index
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
+                onSelected: (_) => setState(() => section = index),
+              ),
             ),
         ];
         if (constraints.maxWidth < 320 ||
@@ -295,21 +299,16 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
     final net = me == null ? 0 : g.netFor(me);
     final hasBalances = me != null && g.pairs(me).values.any((v) => v != 0);
     final type = g.type == 'Direct' ? 'Just you two' : g.type;
+    final memberNames = [
+      for (final member in g.members.take(3))
+        member.userId == c.userId ? 'You' : g.memberName(member.id),
+      if (g.members.length > 3) '+${g.members.length - 3} more',
+    ].join(', ');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        EditorialArtwork(
-          asset: g.type == 'Home'
-              ? HisaabArt.home
-              : g.type == 'Trip'
-              ? HisaabArt.trip
-              : HisaabArt.sharing,
-          height: 128,
-          fit: BoxFit.contain,
-        ),
-        const SizedBox(height: 12),
         Text(g.name, style: Theme.of(context).textTheme.headlineLarge),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           '$type · ${g.members.length} people${g.archived ? ' · Archived' : ''}',
           style: const TextStyle(fontSize: 14, color: HisaabColors.muted),
@@ -322,114 +321,177 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
             ),
           ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 48,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: g.members.length + (g.archived ? 0 : 1),
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              if (index == g.members.length) {
-                return IconButton.filledTonal(
-                  tooltip: 'Add person',
-                  onPressed: c.offline ? null : addMember,
-                  icon: const Icon(Icons.add),
-                );
-              }
-              final member = g.members[index];
-              final name = member.userId == c.userId
-                  ? 'You'
-                  : g.memberName(member.id);
-              return Tooltip(
-                message: name,
-                child: Semantics(
-                  label: name,
-                  child: ExcludeSemantics(child: _MemberAvatar(member, index)),
-                ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact =
+                constraints.maxWidth < 340 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3;
+            return EditorialArtwork(
+              asset: g.type == 'Trip'
+                  ? HisaabArt.tripScene
+                  : HisaabArt.forGroup(g.type),
+              height: compact ? 88 : 148,
+              fit: g.type == 'Trip' ? BoxFit.cover : BoxFit.contain,
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final avatars = Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final (index, member) in g.members.take(3).indexed) ...[
+                  if (index != 0) const SizedBox(width: 4),
+                  Tooltip(
+                    message: member.userId == c.userId
+                        ? 'You'
+                        : g.memberName(member.id),
+                    child: ExcludeSemantics(
+                      child: _MemberAvatar(member, index),
+                    ),
+                  ),
+                ],
+              ],
+            );
+            final names = Text(
+              memberNames,
+              style: const TextStyle(fontSize: 14, color: HisaabColors.ink),
+            );
+            final addPerson = !g.archived
+                ? IconButton(
+                    tooltip: 'Add person',
+                    onPressed: c.offline ? null : addMember,
+                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 20),
+                  )
+                : null;
+            if (constraints.maxWidth < 320 ||
+                MediaQuery.textScalerOf(context).scale(14) > 17) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [avatars, const Spacer(), ?addPerson]),
+                  const SizedBox(height: 4),
+                  names,
+                ],
               );
-            },
-          ),
+            }
+            return Row(
+              children: [
+                avatars,
+                const SizedBox(width: 10),
+                Expanded(child: names),
+                ?addPerson,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 14),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: net < 0 ? HisaabColors.peach : HisaabColors.mint,
-            borderRadius: BorderRadius.circular(20),
+            color: HisaabColors.mint,
+            borderRadius: BorderRadius.circular(22),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      net == 0
-                          ? hasBalances
-                                ? 'No net balance'
-                                : 'You are settled up'
-                          : net > 0
-                          ? 'You get back'
-                          : 'You owe',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    if (net != 0)
-                      FittedBox(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final amountStyle = Theme.of(context).textTheme.headlineLarge
+                  ?.copyWith(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    color: HisaabColors.ink,
+                  );
+              final amountMeasure = TextPainter(
+                text: TextSpan(text: money(net.abs()), style: amountStyle),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+                maxLines: 1,
+              )..layout();
+              final amountWidth = amountMeasure.width;
+              amountMeasure.dispose();
+              final balance = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    net == 0
+                        ? hasBalances
+                              ? 'No net balance'
+                              : 'You are settled up'
+                        : net > 0
+                        ? "You're owed"
+                        : 'You owe',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (net != 0) ...[
+                    const SizedBox(height: 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Text(
                           money(net.abs()),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 32,
-                            color: net < 0
-                                ? HisaabColors.warning
-                                : HisaabColors.positive,
-                          ),
+                          key: const ValueKey('group-balance-amount'),
+                          style: amountStyle,
+                          maxLines: 1,
                         ),
                       ),
-                    if (net == 0 && hasBalances) ...[
-                      const SizedBox(height: 6),
-                      const Text(
-                        'You owe and are owed the same amount. Check Balances before settling up.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: HisaabColors.muted,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
-                ),
-              ),
-              if (!g.archived && section != 1) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: c.offline ? null : openSettlement,
-                  child: const Text('Settle up'),
-                ),
-              ],
-              if (g.archived && !hasBalances && net == 0)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: HisaabColors.positive,
-                  size: 32,
-                ),
-            ],
+                  if (net == 0 && hasBalances) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'You owe and are owed the same amount. Check Balances before settling up.',
+                      style: TextStyle(fontSize: 14, color: HisaabColors.muted),
+                    ),
+                  ],
+                ],
+              );
+              final action = !g.archived
+                  ? OutlinedButton.icon(
+                      onPressed: c.offline ? null : openSettlement,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: HisaabColors.ink,
+                        side: const BorderSide(color: HisaabColors.muted),
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      iconAlignment: IconAlignment.end,
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                      label: const Text('Settle up'),
+                    )
+                  : null;
+              if (constraints.maxWidth < 280 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 17 ||
+                  (!g.archived &&
+                      net != 0 &&
+                      amountWidth + 150 > constraints.maxWidth) ||
+                  (net == 0 && hasBalances)) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    balance,
+                    if (action != null) ...[const SizedBox(height: 12), action],
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: balance),
+                  if (action != null) ...[const SizedBox(width: 12), action],
+                  if (g.archived && !hasBalances && net == 0)
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: HisaabColors.positive,
+                      size: 32,
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ],
     );
-  }
-
-  String _expenseShare(Expense expense) {
-    final me = group!.participant(c.userId);
-    if (me == null ||
-        (expense.payer != me && !expense.shares.containsKey(me))) {
-      return 'You were not involved';
-    }
-    final share = expense.shares[me] ?? 0;
-    final lent = expense.payer == me ? expense.amount - share : 0;
-    return lent > 0 ? 'You lent ${money(lent)}' : 'Your share ${money(share)}';
   }
 
   List<Widget> _expenseList() => [
@@ -447,77 +509,174 @@ class _GroupPageState extends State<GroupPage> with WidgetsBindingObserver {
                 label: const Text('Add the first expense'),
               ),
       ),
-    for (final (index, e) in expenses.indexed)
-      Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: index == 0 ? const Radius.circular(18) : Radius.zero,
-          bottom: index == expenses.length - 1
-              ? const Radius.circular(18)
-              : Radius.zero,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            if (index != 0) const Divider(height: 1, indent: 64),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 4,
-              ),
-              leading: e.receiptId != null && !e.deleted
-                  ? ReceiptThumbnail(controller: c, receiptId: e.receiptId!)
-                  : CircleAvatar(
-                      radius: 22,
-                      backgroundColor: e.deleted
-                          ? HisaabColors.surface
-                          : HisaabColors.peach,
-                      child: Icon(
-                        e.deleted
-                            ? Icons.delete_outline
-                            : _expenseIcon(e.description),
-                        color: HisaabColors.teal,
-                      ),
-                    ),
-              title: Text(
-                e.description,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  decoration: e.deleted ? TextDecoration.lineThrough : null,
-                ),
-              ),
-              subtitle: Column(
+    for (final expense in expenses) _expenseRow(expense),
+    if (cursor != null)
+      TextButton(onPressed: loadMore, child: const Text('Load older expenses')),
+    if (!group!.archived) ...[
+      const SizedBox(height: 8),
+      ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        enabled: !c.offline,
+        leading: const Icon(Icons.attach_file_rounded),
+        title: const Text('Attach receipt'),
+        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+        onTap: attachReceipt,
+      ),
+      const Divider(),
+    ],
+  ];
+
+  Widget _expenseRow(Expense expense) {
+    final me = group!.participant(c.userId);
+    final involved =
+        me != null && (expense.payer == me || expense.shares.containsKey(me));
+    final share = expense.shares[me] ?? 0;
+    final lent = expense.payer == me ? expense.amount - share : 0;
+    final payer = expense.payer == me
+        ? 'You'
+        : group!.memberName(expense.payer);
+    final split = expense.displayMode == 'Equal'
+        ? 'Split equally'
+        : '${expense.displayMode} split';
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => expenseDetails(expense),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 2),
-                  Text(
-                    '${group!.memberName(e.payer)} paid ${money(e.amount)} · ${e.date}',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    e.deleted ? 'Deleted · tap to restore' : _expenseShare(e),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: e.deleted ? HisaabColors.muted : HisaabColors.ink,
+                  if (expense.receiptId != null && !expense.deleted)
+                    ReceiptThumbnail(
+                      controller: c,
+                      receiptId: expense.receiptId!,
+                    )
+                  else
+                    Container(
+                      width: 44,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: expense.deleted
+                            ? HisaabColors.line
+                            : HisaabColors.lime,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        expense.deleted
+                            ? Icons.delete_outline
+                            : _expenseIcon(expense.description),
+                        color: HisaabColors.ink,
+                      ),
+                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final details = Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              expense.description,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                decoration: expense.deleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '$payer paid · $split',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: HisaabColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              expense.date,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: HisaabColors.muted,
+                              ),
+                            ),
+                          ],
+                        );
+                        final amount = Text(
+                          money(expense.amount),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: HisaabColors.ink,
+                          ),
+                        );
+                        if (constraints.maxWidth < 265 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 17) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              details,
+                              const SizedBox(height: 6),
+                              amount,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: details),
+                            const SizedBox(width: 12),
+                            Flexible(child: amount),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
-              trailing: const Icon(
-                Icons.chevron_right_rounded,
-                color: HisaabColors.muted,
-                size: 20,
+              Padding(
+                padding: const EdgeInsets.only(left: 56, top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      expense.deleted
+                          ? 'Deleted · tap to restore'
+                          : involved
+                          ? 'Your share ${money(share)}'
+                          : 'You were not involved',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (!expense.deleted && lent > 0)
+                      Text(
+                        'You lent ${money(lent)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: HisaabColors.muted,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              onTap: () => expenseDetails(e),
-            ),
-          ],
+              const SizedBox(height: 12),
+              const Divider(),
+            ],
+          ),
         ),
       ),
-    if (cursor != null)
-      TextButton(onPressed: loadMore, child: const Text('Load older expenses')),
-  ];
+    );
+  }
+
   List<Widget> _balanceList() => [
     const Padding(
       padding: EdgeInsets.only(bottom: 12),
@@ -1449,11 +1608,11 @@ class _MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CircleAvatar(
-    radius: 24,
+    radius: 18,
     backgroundColor: [
-      HisaabColors.lilac,
       HisaabColors.peach,
       HisaabColors.mint,
+      HisaabColors.lilac,
     ][index % 3],
     foregroundColor: HisaabColors.ink,
     child: Text(

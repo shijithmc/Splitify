@@ -66,7 +66,7 @@ void main() {
       expect(tester.takeException(), isNull);
     }
     await tester.scrollUntilVisible(
-      find.text('Every share, clear'),
+      find.text('Everyone’s share'),
       160,
       scrollable: find.byType(Scrollable).first,
     );

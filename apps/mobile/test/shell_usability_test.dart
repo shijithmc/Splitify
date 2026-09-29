@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisaab/core/models.dart';
+import 'package:hisaab/core/money.dart';
 import 'package:hisaab/core/receipts.dart';
 import 'package:hisaab/features/expense.dart';
 import 'package:hisaab/main.dart';
@@ -43,6 +45,109 @@ Group summary(String name, String type, {bool archived = false}) => Group.from({
 });
 
 void main() {
+  testWidgets('large home balances remain readable with 200% text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.runAsync(() async {
+      for (final family in ['Outfit', 'WorkSans']) {
+        final loader = FontLoader(family);
+        for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+          loader.addFont(rootBundle.load('assets/fonts/$family-$weight.ttf'));
+        }
+        await loader.load();
+      }
+    });
+    final c = await demo(tester);
+    c.balances = {
+      'netPaise': 0,
+      'owedPaise': maxAmountPaise,
+      'owingPaise': maxAmountPaise,
+      'friends': [],
+    };
+    await tester.pumpWidget(HisaabApp(controller: c));
+    final owed = find.byKey(const ValueKey('home-balance-You are owed'));
+    final owing = find.byKey(const ValueKey('home-balance-You owe'));
+    await tester.scrollUntilVisible(
+      owed,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      tester.getBottomLeft(owed).dy,
+      lessThan(tester.getTopLeft(owing).dy),
+    );
+    for (final amount in [owed, owing]) {
+      final text = tester.widget<Text>(amount);
+      expect(text.data, money(maxAmountPaise));
+      final box = tester.renderObject<RenderBox>(amount);
+      final origin = box.localToGlobal(Offset.zero);
+      final fontEnd = box.localToGlobal(Offset(0, text.style!.fontSize! * 2));
+      expect(fontEnd.dy - origin.dy, greaterThanOrEqualTo(24));
+      expect(origin.dx, greaterThanOrEqualTo(38));
+      expect(tester.getBottomRight(amount).dx, lessThanOrEqualTo(282.01));
+    }
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(390, 844);
+    tester.platformDispatcher.textScaleFactorTestValue = 1;
+    c.balances = {
+      'netPaise': 134000,
+      'owedPaise': 196000,
+      'owingPaise': 62000,
+      'friends': [],
+    };
+    c.notifyListeners();
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(owed).dy,
+      closeTo(tester.getTopLeft(owing).dy, .01),
+    );
+    expect(tester.getTopLeft(owed).dx, lessThan(tester.getTopLeft(owing).dx));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'expense dock stays below scrolling content on each main tab',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final c = await demo(tester);
+      await tester.pumpWidget(HisaabApp(controller: c));
+      for (final tab in [0, 1, 2]) {
+        c.selectTab(tab);
+        await tester.pumpAndSettle();
+        final dock = tester.getRect(find.byKey(const Key('expense-dock')));
+        expect(
+          tester.getRect(find.byType(RefreshIndicator)).bottom,
+          lessThanOrEqualTo(dock.top),
+        );
+        expect(find.text('Add expense').hitTestable(), findsOneWidget);
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -240));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byType(RefreshIndicator)).bottom,
+          lessThanOrEqualTo(dock.top),
+        );
+      }
+      c.selectTab(3);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('expense-dock')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+    }),
+  );
+
   testWidgets('home add expense stays reachable on a small screen', (
     tester,
   ) async {

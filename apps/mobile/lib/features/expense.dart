@@ -104,115 +104,127 @@ class _ExpensePageState extends State<ExpensePage> {
         '${selected.length} ${selected.length == 1 ? 'person' : 'people'}';
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.expense == null ? 'Add an expense' : 'Edit expense'),
+        centerTitle: true,
+        title: Text(widget.expense == null ? 'Add expense' : 'Edit expense'),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(
+            40 + (MediaQuery.textScalerOf(context).scale(13) - 13) * 1.35,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: HisaabColors.mint,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Text(
+                g.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: HisaabColors.ink),
+              ),
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
           Expanded(
             child: PageBody(
               children: [
-                Card(
-                  color: HisaabColors.lilac,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        GroupArtwork(type: g.type, size: 46),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                g.name,
-                                style: Theme.of(context).textTheme.titleMedium,
+                TextField(
+                  controller: description,
+                  maxLength: 100,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'What was it for?',
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                    hintText: 'e.g. Dinner, groceries, taxi',
+                    counterText: '',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 12),
+                LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Card(
+                          color: HisaabColors.lime,
+                          child: TextField(
+                            controller: amount,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            style: const TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.2,
+                              color: HisaabColors.ink,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Total amount',
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.always,
+                              labelStyle: const TextStyle(
+                                color: HisaabColors.ink,
                               ),
-                              Text(
-                                '$peopleSummary · A little fairer, together',
-                                style: Theme.of(context).textTheme.bodySmall,
+                              prefixText: '₹',
+                              hintText: '0.00',
+                              suffixIcon: IconButton(
+                                tooltip: 'Open calculator',
+                                onPressed: saving
+                                    ? null
+                                    : () async {
+                                        final paise = await openPage<int>(
+                                          context,
+                                          widget.controller,
+                                          ExpenseCalculatorPage(
+                                            initialAmount: amount.text,
+                                          ),
+                                        );
+                                        if (paise != null && mounted) {
+                                          setState(
+                                            () => amount.text = decimal(paise),
+                                          );
+                                        }
+                                      },
+                                color: HisaabColors.ink,
+                                icon: const Icon(Icons.calculate_outlined),
                               ),
-                            ],
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      ),
+                      if (constraints.maxWidth >= 320 &&
+                          MediaQuery.textScalerOf(context).scale(16) <= 20) ...[
+                        const SizedBox(width: 10),
+                        const SizedBox(
+                          width: 80,
+                          child: EditorialArtwork(
+                            asset: HisaabArt.receipt,
+                            height: 92,
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: description,
-                        maxLength: 100,
-                        textCapitalization: TextCapitalization.sentences,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'What was it for?',
-                          hintText: 'e.g. Dinner, groceries, taxi',
-                          counterText: '',
-                          prefixIcon: Icon(Icons.receipt_long_outlined),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const Divider(height: 1, indent: 48),
-                      TextField(
-                        controller: amount,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        style: const TextStyle(
-                          fontSize: 38,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1.5,
-                          color: HisaabColors.ink,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Total amount',
-                          prefixIcon: const Icon(Icons.currency_rupee),
-                          hintText: '0.00',
-                          suffixIcon: IconButton(
-                            tooltip: 'Open calculator',
-                            onPressed: saving
-                                ? null
-                                : () async {
-                                    final paise = await openPage<int>(
-                                      context,
-                                      widget.controller,
-                                      ExpenseCalculatorPage(
-                                        initialAmount: amount.text,
-                                      ),
-                                    );
-                                    if (paise != null && mounted) {
-                                      setState(
-                                        () => amount.text = decimal(paise),
-                                      );
-                                    }
-                                  },
-                            style: IconButton.styleFrom(
-                              backgroundColor: HisaabColors.lilac,
-                            ),
-                            icon: const Icon(Icons.calculate_outlined),
-                          ),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
                     ],
                   ),
                 ),
@@ -220,45 +232,64 @@ class _ExpensePageState extends State<ExpensePage> {
                 Card(
                   child: Column(
                     children: [
-                      DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        initialValue: payer,
-                        decoration: const InputDecoration(
-                          labelText: 'Paid by',
-                          prefixIcon: Icon(
-                            Icons.account_balance_wallet_outlined,
-                          ),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.only(
-                            top: 12,
-                            bottom: 12,
-                            right: 16,
-                          ),
-                        ),
-                        items: g.members
-                            .where((m) => !m.left || m.id == payer)
-                            .map(
-                              (m) => DropdownMenuItem(
-                                value: m.id,
-                                child: Text(
-                                  m.userId == widget.controller.userId
-                                      ? 'You'
-                                      : m.name,
-                                  overflow: TextOverflow.ellipsis,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            const Text('Paid by'),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: Semantics(
+                                label: 'Paid by',
+                                child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  alignment: AlignmentDirectional.centerEnd,
+                                  initialValue: payer,
+                                  hint: const Text('Choose'),
+                                  icon: const Icon(Icons.expand_more),
+                                  decoration: const InputDecoration(
+                                    filled: false,
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  items: g.members
+                                      .where((m) => !m.left || m.id == payer)
+                                      .map(
+                                        (m) => DropdownMenuItem(
+                                          value: m.id,
+                                          alignment:
+                                              AlignmentDirectional.centerEnd,
+                                          child: Text(
+                                            m.userId == widget.controller.userId
+                                                ? 'You'
+                                                : m.name,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setState(() => payer = v),
                                 ),
                               ),
-                            )
-                            .toList(),
-                        onChanged: (v) => setState(() => payer = v),
+                            ),
+                          ],
+                        ),
                       ),
-                      const Divider(height: 1, indent: 48),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
-                        leading: const Icon(Icons.calendar_today_outlined),
-                        title: Text('Date · $date'),
-                        trailing: const Icon(Icons.chevron_right),
+                        title: const Text('Date'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(date == day(DateTime.now()) ? 'Today' : date),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
                         onTap: () async {
                           final chosen = await showDatePicker(
                             context: context,
@@ -297,34 +328,6 @@ class _ExpensePageState extends State<ExpensePage> {
                       .toList(),
                 ),
                 const SizedBox(height: 8),
-                if (mode == 'Equal')
-                  Card(
-                    child: ExpansionTile(
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                      title: Text('Split equally · $peopleSummary'),
-                      leading: const Icon(Icons.people_outline),
-                      children: g.members.map((m) {
-                        final name = m.userId == widget.controller.userId
-                            ? 'You'
-                            : m.name;
-                        return CheckboxListTile(
-                          title: Text(name),
-                          secondary: _ExpensePerson(name: name),
-                          value: selected.contains(m.id),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          onChanged: m.left || m.deleted
-                              ? null
-                              : (value) => setState(() {
-                                  if (value == true) {
-                                    selected.add(m.id);
-                                  } else {
-                                    selected.remove(m.id);
-                                  }
-                                }),
-                        );
-                      }).toList(),
-                    ),
-                  ),
                 if (mode != 'Equal')
                   Card(
                     child: Column(
@@ -414,13 +417,11 @@ class _ExpensePageState extends State<ExpensePage> {
                       }).toList(),
                     ),
                   ),
-                const SizedBox(height: 14),
+                if (mode != 'Equal') const SizedBox(height: 14),
                 Card(
-                  color: shares != null
-                      ? HisaabColors.mint
-                      : amount.text.isEmpty
-                      ? HisaabColors.lilac
-                      : HisaabColors.peach,
+                  color: shares == null && amount.text.isNotEmpty
+                      ? HisaabColors.peach
+                      : HisaabColors.mint,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -429,29 +430,9 @@ class _ExpensePageState extends State<ExpensePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              shares == null
-                                  ? Icons.info_outline
-                                  : Icons.check_circle_outline,
-                              size: 20,
-                              color: shares == null && amount.text.isNotEmpty
-                                  ? HisaabColors.warning
-                                  : HisaabColors.positive,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                shares != null
-                                    ? 'Every share, clear'
-                                    : 'Split preview',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
+                        const Text(
+                          'Everyone’s share',
+                          style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 8),
                         if (amount.text.isEmpty)
@@ -459,37 +440,88 @@ class _ExpensePageState extends State<ExpensePage> {
                             'Enter an amount to see what everyone owes.',
                           )
                         else if (validation != null)
-                          Text(
-                            validation,
-                            style: const TextStyle(color: HisaabColors.warning),
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              validation,
+                              style: const TextStyle(
+                                color: HisaabColors.warning,
+                              ),
+                            ),
                           )
                         else
                           ...shares!.entries.map(
                             (e) => Padding(
                               padding: const EdgeInsets.symmetric(vertical: 7),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      e.key ==
-                                              g.participant(
-                                                widget.controller.userId,
-                                              )
-                                          ? 'You'
-                                          : g.memberName(e.key),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    money(e.value),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              child: _ExpenseShare(
+                                name: g.memberName(e.key),
+                                isYou:
+                                    e.key ==
+                                    g.participant(widget.controller.userId),
+                                index: g.members.indexWhere(
+                                  (m) => m.id == e.key,
+                                ),
+                                amount: e.value,
                               ),
                             ),
                           ),
+                        if (mode == 'Equal') ...[
+                          const SizedBox(height: 4),
+                          const Divider(),
+                          Theme(
+                            data: Theme.of(
+                              context,
+                            ).copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              tilePadding: EdgeInsets.zero,
+                              title: Text(
+                                'Split equally · $peopleSummary',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: HisaabColors.muted,
+                                ),
+                              ),
+                              trailing: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Edit',
+                                    style: TextStyle(
+                                      color: HisaabColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.expand_more,
+                                    color: HisaabColors.primary,
+                                  ),
+                                ],
+                              ),
+                              children: g.members.map((m) {
+                                final name =
+                                    m.userId == widget.controller.userId
+                                    ? 'You'
+                                    : m.name;
+                                return CheckboxListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(name),
+                                  value: selected.contains(m.id),
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  onChanged: m.left || m.deleted
+                                      ? null
+                                      : (value) => setState(() {
+                                          if (value == true) {
+                                            selected.add(m.id);
+                                          } else {
+                                            selected.remove(m.id);
+                                          }
+                                        }),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
                         if (shares != null && mode != 'Exact') ...[
                           Material(
                             color: Colors.transparent,
@@ -497,7 +529,10 @@ class _ExpensePageState extends State<ExpensePage> {
                               tilePadding: EdgeInsets.zero,
                               title: const Text(
                                 'How rounding works',
-                                style: TextStyle(fontSize: 14),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: HisaabColors.muted,
+                                ),
                               ),
                               children: [
                                 Text(
@@ -517,8 +552,10 @@ class _ExpensePageState extends State<ExpensePage> {
                 ),
                 if (widget.expense == null) ...[
                   const SizedBox(height: 12),
-                  Card(
+                  Material(
+                    color: Colors.transparent,
                     child: ListTile(
+                      contentPadding: EdgeInsets.zero,
                       onTap: () async {
                         final saved = await openPage<bool>(
                           context,
@@ -581,7 +618,7 @@ class _ExpensePageState extends State<ExpensePage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      FilledButton.icon(
+                      FilledButton(
                         onPressed:
                             saving ||
                                 payer == null ||
@@ -590,8 +627,7 @@ class _ExpensePageState extends State<ExpensePage> {
                                 widget.controller.offline
                             ? null
                             : save,
-                        icon: Icon(saving ? Icons.hourglass_top : Icons.check),
-                        label: Text(saving ? 'Saving…' : 'Save expense'),
+                        child: Text(saving ? 'Saving…' : 'Save expense'),
                       ),
                     ],
                   ),
@@ -639,16 +675,65 @@ class _ExpensePageState extends State<ExpensePage> {
   }
 }
 
+class _ExpenseShare extends StatelessWidget {
+  final String name;
+  final bool isYou;
+  final int index, amount;
+  const _ExpenseShare({
+    required this.name,
+    required this.isYou,
+    required this.index,
+    required this.amount,
+  });
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final person = Row(
+        children: [
+          _ExpensePerson(name: name, index: index),
+          const SizedBox(width: 12),
+          Expanded(child: Text(isYou ? 'You' : name)),
+        ],
+      );
+      final value = Text(
+        money(amount),
+        textAlign: TextAlign.end,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      );
+      if (constraints.maxWidth < 280 ||
+          MediaQuery.textScalerOf(context).scale(16) > 20) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [person, const SizedBox(height: 4), value],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(child: person),
+          const SizedBox(width: 12),
+          Expanded(child: value),
+        ],
+      );
+    },
+  );
+}
+
 class _ExpensePerson extends StatelessWidget {
   final String name;
-  const _ExpensePerson({required this.name});
+  final int index;
+  const _ExpensePerson({required this.name, this.index = 0});
 
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
     child: CircleAvatar(
-      radius: 18,
-      backgroundColor: HisaabColors.lilac,
-      foregroundColor: HisaabColors.primary,
+      radius: 17,
+      backgroundColor: const [
+        HisaabColors.peach,
+        Color(0xFFB5CDB4),
+        Color(0xFFCBDEFF),
+      ][index % 3],
+      foregroundColor: HisaabColors.ink,
       child: Text(
         name.characters.firstOrNull?.toUpperCase() ?? '?',
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),

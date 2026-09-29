@@ -120,6 +120,8 @@ void main() {
       160,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    expect(people.hitTestable(), findsOneWidget);
     await tester.tap(people);
     await tester.pumpAndSettle();
     final excluded = group.members.last;
@@ -129,6 +131,8 @@ void main() {
       160,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    expect(checkbox.hitTestable(), findsOneWidget);
     await tester.tap(checkbox);
     await tester.pumpAndSettle();
     expect(find.text('Split equally · 2 people'), findsOneWidget);
@@ -146,6 +150,39 @@ void main() {
     expect(saved.shares.containsKey(excluded.id), isFalse);
     expect(saved.shares.values, everyElement(5000));
     expect(saved.shares.length, 2);
+  });
+
+  testWidgets('large shares stay readable on a narrow screen at 2x text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await openExpense(tester);
+    await tester.enterText(find.byType(TextField).first, 'A shared purchase');
+    await enterAmount(tester, '10000000');
+    tester.testTextInput.hide();
+    final largestShare = find.text('₹33,33,333.34');
+    await tester.scrollUntilVisible(
+      largestShare,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(largestShare, findsOneWidget);
+    expect(find.text('₹33,33,333.33'), findsNWidgets(2));
+    expect(tester.getTopLeft(largestShare).dx, greaterThanOrEqualTo(20));
+    expect(tester.getBottomRight(largestShare).dx, lessThanOrEqualTo(300));
+    final amountText = tester.widget<Text>(largestShare);
+    expect(amountText.maxLines, isNull);
+    expect(amountText.overflow, isNull);
+    expect(amountText.textScaler, isNull);
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('tapping the current split method preserves edited allocations', (
